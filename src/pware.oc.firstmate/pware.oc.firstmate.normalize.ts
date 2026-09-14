@@ -94,9 +94,11 @@ function fresh(value: unknown): FirstmateFreshness {
   return "unknown"
 }
 
-/** Only the producer's own observations decide freshness; none reported stays unknown. */
+/**
+ * Only the producer's own observations decide freshness. A successful read with
+ * nothing to observe is a healthy idle fleet, not a degraded one.
+ */
 function overallFreshness(observations: readonly FirstmateFreshness[]): FirstmateFreshness {
-  if (observations.length === 0) return "unknown"
   if (observations.includes("stale")) return "stale"
   if (observations.includes("unknown")) return "unknown"
   return "fresh"

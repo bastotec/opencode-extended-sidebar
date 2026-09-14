@@ -117,14 +117,14 @@ describe("normalizeFirstmate", () => {
   test("marks a rowless omitted home partial with no freshness of its own", () => {
     const snapshot = normalizeFirstmate(omissionOnly, "/tmp/fm-home", "/tmp/fm-root")
     expect(snapshot.workItems).toEqual([])
-    expect(snapshot.freshness).toBe("unknown")
     expect(snapshot.completeness).toBe("partial")
+    expect(snapshot.freshness).toBe("fresh")
 
     const cached = structuredClone(omissionOnly)
     cached.secondmate_current.records[0].freshness.status = "cached"
-    const stale = normalizeFirstmate(cached, "/tmp/fm-home", "/tmp/fm-root")
-    expect(stale.workItems).toEqual([])
-    expect(stale.freshness).toBe("unknown")
+    const hidden = normalizeFirstmate(cached, "/tmp/fm-home", "/tmp/fm-root")
+    expect(hidden.workItems).toEqual([])
+    expect(hidden.freshness).toBe("fresh")
   })
 
   test("a visible stale Secondmate row still makes the section stale", () => {
@@ -207,7 +207,7 @@ describe("normalizeFirstmate", () => {
     expect(snapshot.freshness).toBe("fresh")
   })
 
-  test("reports unknown aggregate freshness when the producer observed nothing", () => {
+  test("a queued-only fleet with no runtime observations reads as fresh", () => {
     const unobserved = structuredClone(fixture)
     unobserved.tasks = []
     unobserved.secondmate_current.records = []
@@ -216,9 +216,23 @@ describe("normalizeFirstmate", () => {
     unobserved.secondmate_current.shown = 0
 
     const snapshot = normalizeFirstmate(unobserved, "/tmp/fm-home", "/tmp/fm-root")
-    expect(snapshot.freshness).toBe("unknown")
+    expect(snapshot.freshness).toBe("fresh")
     expect(snapshot.workItems.map((item) => item.taskId)).toEqual(["q1", "i1", "h1", "b1", "p1"])
     expect(snapshot.workItems.every((item) => item.freshness === "unknown")).toBe(true)
+  })
+
+  test("a complete empty fleet is healthy, so the section reports nothing", () => {
+    const idle = structuredClone(fixture)
+    idle.backlog.records = []
+    idle.tasks = []
+    idle.secondmate_current.records = []
+    idle.secondmate_current.total_registered = 0
+    idle.secondmate_current.total = 0
+    idle.secondmate_current.shown = 0
+
+    const snapshot = normalizeFirstmate(idle, "/tmp/fm-home", "/tmp/fm-root")
+    expect(snapshot).toMatchObject({ availability: "available", completeness: "complete", freshness: "fresh" })
+    expect(snapshot.workItems).toEqual([])
   })
 
   test("preserves stale aggregate freshness across stale and unknown Secondmate homes", () => {

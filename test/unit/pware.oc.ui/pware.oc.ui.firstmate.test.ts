@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test"
 import type { FirstmateSnapshot, FirstmateWorkItem } from "../../../src/pware.oc.firstmate/pware.oc.firstmate.model.js"
 import { composeRow } from "../../../src/pware.oc.ui/pware.oc.ui.sections.js"
 import { firstmateContext, firstmateDetailLines, firstmateNotice, firstmateRow, firstmateSection, firstmateState } from "../../../src/pware.oc.ui/pware.oc.ui.firstmate.js"
+import { normalizeFirstmate } from "../../../src/pware.oc.firstmate/pware.oc.firstmate.normalize.js"
+
+const fleet = await Bun.file(new URL("../../fixtures/firstmate/fleet.json", import.meta.url)).json()
 
 const NOW = Date.UTC(2026, 8, 14, 12, 0, 0)
 
@@ -78,6 +81,9 @@ describe("Firstmate sidebar rows", () => {
     expect(firstmateState(work({ durableState: "in_flight" })).label).toBe("In flight")
     expect(firstmateState(work({ durableState: "in_flight", currentState: "custom-state" })).label).toBe("Custom State")
     expect(firstmateState(work({ currentState: "custom-state" })).label).toBe("Custom State")
+    expect(firstmateState(work({ currentRole: "decision" }))).toEqual({ label: "Decision", glyph: { char: "?", tone: "warning" } })
+    expect(firstmateState(work({ currentRole: "decision", durableState: "queued" })).label).toBe("Queued")
+    expect(firstmateState(work({ currentRole: "decision", holdKind: "captain" })).label).toBe("Held")
     expect(firstmateState(work()).label).toBe("Unknown")
   })
 
@@ -161,10 +167,20 @@ describe("Firstmate sidebar rows", () => {
     expect(composed.truncated).toBe(true)
   })
 
+  test("an open Secondmate decision from a real fleet reads as a decision", () => {
+    const snapshot = normalizeFirstmate(fleet, "/tmp/fm-home", "/tmp/fm-root")
+    const decision = snapshot.workItems.find((item) => item.taskId === "remote-decision")
+    expect(decision?.currentRole).toBe("decision")
+    expect(firstmateRow(decision!)).toMatchObject({ suffix: "Decision", glyph: { char: "?", tone: "warning" } })
+    const captainHold = snapshot.workItems.find((item) => item.taskId === "captain-only")
+    expect(firstmateRow(captainHold!).suffix).toBe("Held")
+  })
+
   test("surfaces unavailable, partial, stale, and unknown inventory honestly", () => {
     expect(firstmateNotice(undefined)).toBeNull()
     expect(firstmateNotice(snapshot({ availability: "unavailable", completeness: "partial", freshness: "stale" }))?.label).toBe("Inventory unavailable · partial · stale")
     expect(firstmateNotice(snapshot({ completeness: "partial", freshness: "stale" }))?.label).toBe("Inventory partial · stale")
+    expect(firstmateNotice(snapshot())).toBeNull()
     expect(firstmateNotice(snapshot({ freshness: "unknown" }))?.label).toBe("Inventory freshness unknown")
     // The corrected normalizer keeps a stale source visible even when another
     // source is unknown, so the aggregate snapshot reaches the UI as stale.

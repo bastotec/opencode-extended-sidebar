@@ -85,6 +85,9 @@ export function firstmateState(work: FirstmateWorkItem): FirstmateState {
   if (matches(observed, "failed", "error")) {
     return { label: "Failed", glyph: { char: "×", tone: "error" } }
   }
+  if (normalized(work.currentRole) === "decision") {
+    return { label: "Decision", glyph: { char: "?", tone: "warning" } }
+  }
   const custom = work.currentState?.trim() || work.durableState?.trim()
   if (custom) return { label: customLabel(custom), glyph: { char: "•", tone: "textMuted" } }
   return { label: "Unknown", glyph: { char: "•", tone: "textMuted" } }
