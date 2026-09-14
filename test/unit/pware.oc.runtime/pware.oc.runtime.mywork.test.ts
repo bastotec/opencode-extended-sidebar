@@ -282,7 +282,7 @@ describe("toApprovalItems", () => {
       { rel: "plans/d.md", name: "d", status: "done", pendingAction: null, updatedAt: null, sessionState: null, review: null, workState: "absent", todosDone: false },
     ])
     expect(items.map((i) => i.kind)).toEqual(["finished"])
-    expect(items.map((i) => ("sessionId" in i ? null : i.name))).toEqual(["d"])
+    expect(items.map((i) => ("name" in i ? i.name : null))).toEqual(["d"])
   })
 
   test("reconciles approved plans that actually finished — boulder or writer todos", () => {
@@ -350,14 +350,14 @@ describe("groupMyWork", () => {
     const draftDoc: MyWorkItem = { kind: "draft-docs", name: "old", rel: "drafts/old.md", updatedAt: null }
     const planDoc: MyWorkItem = { kind: "plans", name: "plan-x", rel: "plans/plan-x.md", updatedAt: null }
     const pinned: MyWorkItem = { kind: "pinned", sessionId: "ses_p", title: "Pinned", status: "idle", timeUpdated: 1_000 }
-    const firstmate: MyWorkItem = { kind: "firstmate", name: "Durable", rel: "", pendingAction: null, updatedAt: 1_000, sessionState: null, review: null, work: {
+    const firstmate: MyWorkItem = { kind: "firstmate", work: {
       home: "/tmp/fm", taskId: "task-1", taskKind: null, project: null, title: "Durable", harness: null,
       backend: null, worktree: null, durableState: "queued", currentRole: "queued", currentState: null,
       currentSource: null, currentDetail: null, currentReason: null, holdKind: null, holdBucket: null,
       holdReason: null, holdUntil: null, holdAgeDays: null, captainActionable: null,
-      blockedByIds: [], unresolvedBlockerIds: [], unresolvedBlockers: [], provenance: ["main-backlog"],
+      blockedByIds: [], unresolvedBlockerIds: [], provenance: ["main-backlog"],
       provenanceSelected: null, provenanceTrust: null, sourceFreshness: "fresh", freshness: "fresh",
-      observedAt: 1_000, ageSeconds: null, homeCounts: null,
+      observedAt: 1_000, ageSeconds: null,
     } }
     expect(
       groupMyWork([finished, dismissed, draftDoc, planDoc, pinned, approval, readyStart, drafting, question, interrupted, errored, firstmate, sessions]).map(

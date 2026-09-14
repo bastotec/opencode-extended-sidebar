@@ -6,7 +6,6 @@ import { unavailableFirstmate, type FirstmateSnapshot } from "./pware.oc.firstma
 export const FIRSTMATE_POLL_MS = 30_000
 
 export type FirstmatePollerHandle = {
-  refresh: () => void
   stop: () => void
 }
 
@@ -41,12 +40,10 @@ export function startFirstmatePoller(options: FirstmatePollerOptions): Firstmate
   if (!config.configured) return null
   if (config.diagnostic) {
     options.onSnapshot(unavailableFirstmate(config.home, config.root, config.diagnostic))
-    return { refresh: () => {}, stop: () => {} }
+    return { stop: () => {} }
   }
 
   let stopped = false
-  let running = false
-  let refreshPending = false
   let timer: ReturnType<typeof setTimeout> | null = null
   let controller: AbortController | null = null
   let lastGood: FirstmateSnapshot | null = null
@@ -59,13 +56,8 @@ export function startFirstmatePoller(options: FirstmatePollerOptions): Firstmate
   }
   const invoke = (): void => {
     if (stopped) return
-    if (running) {
-      refreshPending = true
-      return
-    }
     if (timer) clearTimeout(timer)
     timer = null
-    running = true
     controller = new AbortController()
     void run(config, { signal: controller.signal }).then((result) => {
       if (stopped) return
@@ -100,22 +92,16 @@ export function startFirstmatePoller(options: FirstmatePollerOptions): Firstmate
         options.onSnapshot(snapshot)
       }
     }).finally(() => {
-      running = false
       controller = null
       if (stopped) return
-      if (refreshPending) {
-        refreshPending = false
-        invoke()
-      } else schedule()
+      schedule()
     })
   }
 
   invoke()
   return {
-    refresh: invoke,
     stop: () => {
       stopped = true
-      refreshPending = false
       if (timer) clearTimeout(timer)
       timer = null
       controller?.abort()

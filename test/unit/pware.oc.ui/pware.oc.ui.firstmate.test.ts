@@ -27,7 +27,6 @@ const work = (patch: Partial<FirstmateWorkItem> = {}): FirstmateWorkItem => ({
   captainActionable: null,
   blockedByIds: [],
   unresolvedBlockerIds: [],
-  unresolvedBlockers: [],
   provenance: [],
   provenanceSelected: null,
   provenanceTrust: null,

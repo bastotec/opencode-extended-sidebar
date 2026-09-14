@@ -62,6 +62,15 @@ describe("normalizeFirstmate", () => {
     expect(duplicated.every((item) => item.remote === true)).toBe(true)
   })
 
+  test("reports unknown freshness for a durable record the producer never observed", () => {
+    const snapshot = normalizeFirstmate(fixture, "/tmp/fm-home", "/tmp/fm-root")
+    expect(snapshot.workItems.find((item) => item.taskId === "b1")).toMatchObject({
+      sourceFreshness: null,
+      freshness: "unknown",
+    })
+    expect(snapshot.workItems.find((item) => item.taskId === "i1")?.freshness).toBe("fresh")
+  })
+
   test("does not authorize navigation from unknown v1 extension fields", () => {
     const extended = structuredClone(fixture)
     extended.tasks[0].opencode_session_id = "ses_not_canonical"
@@ -86,7 +95,6 @@ describe("normalizeFirstmate", () => {
       blockedReason: "historical dependency note",
       blockedByIds: ["dep1"],
       unresolvedBlockerIds: [],
-      unresolvedBlockers: [],
     })
   })
 
@@ -99,16 +107,11 @@ describe("normalizeFirstmate", () => {
     expect(snapshot.diagnostic.join(" ")).toContain("omitted")
     expect(snapshot.diagnostic.join(" ")).toContain("unreadable")
     const item = snapshot.workItems.find((entry) => entry.taskId === "partial-queued")
-    expect(item).toMatchObject({ freshness: "stale", sourceFreshness: "cached", ageSeconds: 3660 })
-    expect(item?.homeCounts?.queued).toBe(2)
-    expect(snapshot.workItems.some((entry) => entry.home === "/srv/mate-unreadable")).toBe(false)
-    expect(snapshot.homes?.find((home) => home.id === "mate-partial")).toMatchObject({
+    expect(item).toMatchObject({
+      freshness: "stale", sourceFreshness: "cached", ageSeconds: 3660,
       provenanceSelected: "structured-home", provenanceTrust: "partial-structured",
-      summarySource: "remote-ledger-cache", ageSeconds: 3660,
     })
-    expect(snapshot.homes?.find((home) => home.id === "mate-unreadable")).toMatchObject({
-      currentState: "unknown", provenanceSelected: "parent-event-fallback",
-    })
+    expect(snapshot.workItems.some((entry) => entry.home === "/srv/mate-unreadable")).toBe(false)
   })
 
   test("marks a fresh valid snapshot partial for positive per-home omissions", () => {
@@ -131,7 +134,7 @@ describe("normalizeFirstmate", () => {
     expect(snapshot.availability).toBe("available")
     expect(snapshot.completeness).toBe("partial")
     expect(snapshot.workItems.find((item) => item.taskId === "remote-blocked")?.durableState).toBeNull()
-    expect(snapshot.homes?.[0]?.provenanceTrust).toBe("partial-structured")
+    expect(snapshot.workItems.find((item) => item.taskId === "remote-decision")?.provenanceTrust).toBe("partial-structured")
     expect(snapshot.diagnostic.join(" ")).toContain("malformed")
   })
 

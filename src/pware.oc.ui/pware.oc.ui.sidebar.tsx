@@ -270,9 +270,7 @@ export function SidebarPanel(props: SidebarProps): JSX.Element {
     rootBox = node
     node.onSizeChange = () => {
       const w = node.width
-      // The fallback is only for pre-layout. Once measured, honor even a very
-      // narrow sidebar so clipped rows never wrap into the next line.
-      if (Number.isFinite(w) && w > 0) setLineWidth(Math.max(1, Math.floor(w) - ROW_LINE_RESERVE))
+      if (Number.isFinite(w) && w > 0) setLineWidth(Math.max(ROW_LINE_FALLBACK, w - ROW_LINE_RESERVE))
     }
   }
   const lineMax = (): number => lineWidth()

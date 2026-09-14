@@ -37,7 +37,6 @@ describe("Firstmate runtime source composition", () => {
     const published: RuntimeSnapshot[] = []
     bus.on(EV_OES_SNAPSHOT, (event) => published.push((event.data as { snapshot: RuntimeSnapshot }).snapshot))
     let fleetStarts = 0
-    let fleetRefreshes = 0
     let fleetStops = 0
     let monitorRefreshes = 0
     let monitorStops = 0
@@ -58,10 +57,7 @@ describe("Firstmate runtime source composition", () => {
       firstmatePollerFactory: (options) => {
         fleetStarts++
         options.onSnapshot(unavailableFirstmate("/tmp/home", "/tmp/root", "fleet unavailable"))
-        return {
-          refresh: () => { fleetRefreshes++ },
-          stop: () => { fleetStops++ },
-        }
+        return { stop: () => { fleetStops++ } }
       },
     })
 
@@ -69,18 +65,15 @@ describe("Firstmate runtime source composition", () => {
     expect(published.at(-1)?.firstmate?.home).toBe("/tmp/home")
     source.refresh()
     expect(monitorRefreshes).toBe(1)
-    expect(fleetRefreshes).toBe(0)
     bus.emit({ type: EV_OES_REFRESH_HINT, ts: Date.now() })
     await Bun.sleep(120)
     expect(monitorRefreshes).toBe(2)
-    expect(fleetRefreshes).toBe(0)
+    expect(fleetStarts).toBe(1)
     source.setSession("two")
     expect(sessions).toEqual(["one", "two"])
     expect(fleetStarts).toBe(1)
     expect(published.at(-1)?.db.error).toBe("db read failed")
     expect(published.at(-1)?.firstmate?.home).toBe("/tmp/home")
-    source.refreshFirstmate()
-    expect(fleetRefreshes).toBe(1)
     source.stop()
     expect(monitorStops).toBe(2)
     expect(fleetStops).toBe(1)

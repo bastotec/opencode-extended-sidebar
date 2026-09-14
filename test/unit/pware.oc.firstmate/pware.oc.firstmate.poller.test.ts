@@ -14,7 +14,8 @@ const good = await Bun.file(new URL("../../fixtures/firstmate/fleet.json", impor
 const degraded = await Bun.file(new URL("../../fixtures/firstmate/fleet-degraded.json", import.meta.url)).text()
 
 async function waitFor(check: () => boolean): Promise<void> {
-  for (let i = 0; i < 100 && !check(); i++) await Bun.sleep(2)
+  const deadline = Date.now() + 10_000
+  while (!check() && Date.now() < deadline) await Bun.sleep(1)
 }
 
 describe("startFirstmatePoller", () => {
@@ -37,7 +38,7 @@ describe("startFirstmatePoller", () => {
     let call = 0
     const handle = startFirstmatePoller({
       configuration: config,
-      pollMs: 60_000,
+      pollMs: 1,
       onSnapshot: (snapshot) => snapshots.push(snapshot),
       run: async () => {
         call++
@@ -45,14 +46,10 @@ describe("startFirstmatePoller", () => {
         return { ok: true, stdout: good, stderr: "", exitCode: 0, reason: "ok" as const }
       },
     })
-    await waitFor(() => snapshots.length === 1)
-    handle?.refresh()
-    await waitFor(() => snapshots.length === 2)
+    await waitFor(() => snapshots.length >= 3)
     expect(snapshots[1]?.freshness).toBe("stale")
     expect(snapshots[1]?.observedAt).toBe(Date.parse("2026-09-13T12:00:00Z"))
     expect(snapshots[1]?.workItems.some((item) => item.taskId === "q1")).toBe(true)
-    handle?.refresh()
-    await waitFor(() => snapshots.length === 3)
     expect(snapshots[2]?.freshness).toBe("fresh")
     handle?.stop()
   })
@@ -62,7 +59,7 @@ describe("startFirstmatePoller", () => {
     let call = 0
     const handle = startFirstmatePoller({
       configuration: config,
-      pollMs: 60_000,
+      pollMs: 1,
       onSnapshot: (snapshot) => snapshots.push(snapshot),
       run: async () => {
         call++
@@ -70,13 +67,9 @@ describe("startFirstmatePoller", () => {
         return { ok: true, stdout, stderr: "", exitCode: 0, reason: "ok" as const }
       },
     })
-    await waitFor(() => snapshots.length === 1)
-    handle?.refresh()
-    await waitFor(() => snapshots.length === 2)
+    await waitFor(() => snapshots.length >= 3)
     expect(snapshots[1]?.freshness).toBe("stale")
     expect(snapshots[1]?.workItems.some((item) => item.taskId === "q1")).toBe(true)
-    handle?.refresh()
-    await waitFor(() => snapshots.length === 3)
     expect(snapshots[2]?.completeness).toBe("partial")
     expect(snapshots[2]?.workItems.map((item) => item.taskId)).toEqual(["partial-queued"])
     handle?.stop()
@@ -101,7 +94,7 @@ describe("startFirstmatePoller", () => {
     let call = 0
     const handle = startFirstmatePoller({
       configuration: config,
-      pollMs: 60_000,
+      pollMs: 0,
       onSnapshot: (snapshot) => snapshots.push(snapshot),
       run: async () => {
         call++
@@ -109,15 +102,12 @@ describe("startFirstmatePoller", () => {
         return { ok: false, stdout: "", stderr: `failure ${call}`, exitCode: 2, reason: "nonzero" as const }
       },
     })
-    await waitFor(() => snapshots.length === 1)
-    for (let expected = 2; expected <= 270; expected++) {
-      handle?.refresh()
-      await waitFor(() => snapshots.length === expected)
-    }
-    expect(snapshots.at(-1)?.diagnostic).toHaveLength(256)
-    expect(snapshots.at(-1)?.diagnostic.at(-1)).toContain("failure 270")
-    expect(snapshots.at(-1)?.diagnostic[0]).toContain("failure 15")
+    await waitFor(() => snapshots.length >= 270)
     handle?.stop()
+    const bounded = snapshots[269]
+    expect(bounded?.diagnostic).toHaveLength(256)
+    expect(bounded?.diagnostic.at(-1)).toContain("failure 270")
+    expect(bounded?.diagnostic[0]).toContain("failure 15")
   })
 
   test("allows only one command in flight and ignores a late result after stop", async () => {
@@ -132,7 +122,7 @@ describe("startFirstmatePoller", () => {
         return new Promise((done) => { resolve = done })
       },
     })
-    handle?.refresh()
+    await Bun.sleep(5)
     expect(calls).toBe(1)
     handle?.stop()
     resolve({ ok: true, stdout: good, stderr: "", exitCode: 0, reason: "ok" })

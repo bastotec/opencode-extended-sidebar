@@ -78,7 +78,7 @@ OES_FIRSTMATE_ROOT="$HOME/path/to/firstmate-code" \
 opencode
 ```
 
-For compatibility, OES also accepts `FM_HOME`, then `FM_ROOT_OVERRIDE`, as home fallbacks. Root lookup uses `OES_FIRSTMATE_ROOT`, then `FM_ROOT_OVERRIDE`. Without an explicit home variable, Firstmate stays disabled and starts no process or timer.
+`OES_FIRSTMATE_HOME` is the only opt-in; Firstmate's own `FM_*` variables are never read as one, so an ambient Firstmate environment cannot enable the integration. Without `OES_FIRSTMATE_HOME`, Firstmate stays disabled and starts no process or timer.
 
 The group shows durable queued, in-flight, held, and blocked work across harnesses, even when no live OpenCode session exists. Selecting a row opens read-only details. There is currently no session navigation because `fm-fleet-snapshot.v1` has no durable OpenCode session mapping.
 

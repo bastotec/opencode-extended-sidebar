@@ -56,7 +56,7 @@ export function firstmateState(work: FirstmateWorkItem): FirstmateState {
   const durable = normalized(work.durableState)
   const current = normalized(work.currentState)
   const states = [durable, current]
-  const blockers = [...(work.unresolvedBlockers ?? []), ...(work.unresolvedBlockerIds ?? [])]
+  const blockers = work.unresolvedBlockerIds ?? []
   if (blockers.length > 0 || states.some((state) => matches(state, "blocked"))) {
     return { label: "Blocked", glyph: { char: "!", tone: "warning" } }
   }
@@ -225,7 +225,7 @@ export function firstmateDetailLines(work: FirstmateWorkItem, now = Date.now()):
   add(lines, "Hold until", work.holdUntil)
   if (work.captainActionable != null) add(lines, "Captain actionable", work.captainActionable ? "yes" : "no")
   add(lines, "Dependencies", list(work.blockedByIds))
-  add(lines, "Unresolved blockers", list(work.unresolvedBlockerIds ?? work.unresolvedBlockers))
+  add(lines, "Unresolved blockers", list(work.unresolvedBlockerIds))
   add(lines, "Blocked reason", work.blockedReason)
   const decisions = work.decisions ?? []
   for (const decision of decisions.slice(0, 5)) {

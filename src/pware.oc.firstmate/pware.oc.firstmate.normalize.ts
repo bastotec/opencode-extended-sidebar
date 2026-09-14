@@ -2,7 +2,6 @@ import path from "node:path"
 import {
   FIRSTMATE_SNAPSHOT_SCHEMA,
   type FirstmateFreshness,
-  type FirstmateHomeSummary,
   type FirstmateSnapshot,
   type FirstmateWorkItem,
 } from "./pware.oc.firstmate.model.js"
@@ -320,7 +319,6 @@ function emptyItem(home: string, taskId: string): FirstmateWorkItem {
     captainActionable: null,
     blockedByIds: [],
     unresolvedBlockerIds: [],
-    unresolvedBlockers: [],
     provenance: [],
     provenanceSelected: null,
     provenanceTrust: null,
@@ -328,17 +326,8 @@ function emptyItem(home: string, taskId: string): FirstmateWorkItem {
     freshness: "unknown",
     observedAt: null,
     ageSeconds: null,
-    homeCounts: null,
     decisions: [],
   }
-}
-
-function counts(value: unknown): Record<string, number> | null {
-  const row = object(value)
-  if (!row) return null
-  const out: Record<string, number> = {}
-  for (const [key, count] of Object.entries(row)) if (typeof count === "number" && Number.isFinite(count)) out[key] = count
-  return out
 }
 
 function mainItems(home: string, generatedAt: number, backlog: JsonObject, tasks: JsonObject[]): FirstmateWorkItem[] {
@@ -382,10 +371,9 @@ function mainItems(home: string, generatedAt: number, backlog: JsonObject, tasks
       captainActionable: bool(durable?.captain_actionable),
       blockedByIds,
       unresolvedBlockerIds,
-      unresolvedBlockers: unresolvedBlockerIds,
       provenance: [...new Set([...(durable ? ["main-backlog"] : []), ...(task ? ["main-task-metadata"] : [])])],
-      sourceFreshness: sourceFreshness ?? "fresh",
-      freshness: sourceFreshness ? fresh(sourceFreshness) : "fresh",
+      sourceFreshness,
+      freshness: fresh(sourceFreshness),
       observedAt,
     })
     if (!durable && task) item.warning = "Task metadata has no canonical backlog record"
@@ -394,12 +382,8 @@ function mainItems(home: string, generatedAt: number, backlog: JsonObject, tasks
   return out
 }
 
-function secondmateItems(records: JsonObject[], diagnostic: string[]): {
-  items: FirstmateWorkItem[]
-  homes: FirstmateHomeSummary[]
-} {
+function secondmateItems(records: JsonObject[], diagnostic: string[]): FirstmateWorkItem[] {
   const byKey = new Map<string, FirstmateWorkItem>()
-  const homes: FirstmateHomeSummary[] = []
   const get = (home: string, host: string | null, remote: boolean, id: string): FirstmateWorkItem => {
     const key = `${remote ? `remote:${host ?? "unknown"}` : "local"}\0${home}\0${id}`
     let item = byKey.get(key)
@@ -425,24 +409,7 @@ function secondmateItems(records: JsonObject[], diagnostic: string[]): {
     const sourceFreshness = text(freshness?.status)
     const observedAt = time(freshness?.observed_at)
     const ageSeconds = finite(freshness?.age_seconds)
-    const homeCounts = counts(summary.counts)
     const reason = text(current?.reason)
-    homes.push({
-      id: homeId,
-      home,
-      host,
-      remote,
-      currentState: text(current?.state),
-      currentReason: reason,
-      provenanceSelected: selected,
-      provenanceTrust: trust,
-      summarySource: text(provenance?.summary_source),
-      sourceFreshness,
-      observedAt,
-      ageSeconds,
-      counts: homeCounts,
-      omitted: objects(summary.omitted).map((entry) => ({ surface: text(entry.surface), count: finite(entry.count) })),
-    })
     if (!home || selected !== "structured-home") {
       diagnostic.push(`secondmate ${homeId}: ${reason ?? "structured home unavailable"}`)
       continue
@@ -459,7 +426,6 @@ function secondmateItems(records: JsonObject[], diagnostic: string[]): {
       item.freshness = fresh(sourceFreshness)
       item.observedAt = observedAt
       item.ageSeconds = ageSeconds
-      item.homeCounts = homeCounts
       item.currentReason = reason
     }
     for (const row of objects(summary.active_children)) {
@@ -494,7 +460,6 @@ function secondmateItems(records: JsonObject[], diagnostic: string[]): {
       item.captainActionable = bool(row.captain_actionable)
       item.blockedByIds = strings(row.blocked_by_ids)
       item.unresolvedBlockerIds = strings(row.unresolved_blocker_ids)
-      item.unresolvedBlockers = item.unresolvedBlockerIds
       if (item.holdKind) item.currentRole = "held"
     }
     for (const row of objects(summary.holds)) {
@@ -507,7 +472,6 @@ function secondmateItems(records: JsonObject[], diagnostic: string[]): {
       item.currentDetail = item.currentDetail ?? text(row.reason)
       item.blockedByIds = item.blockedByIds?.length ? item.blockedByIds : strings(row.blocked_by_ids)
       item.unresolvedBlockerIds = item.unresolvedBlockerIds?.length ? item.unresolvedBlockerIds : strings(row.unresolved_blocker_ids)
-      item.unresolvedBlockers = item.unresolvedBlockerIds ?? []
     }
     for (const row of objects(summary.decisions_open)) {
       const id = text(row.id)
@@ -542,7 +506,7 @@ function secondmateItems(records: JsonObject[], diagnostic: string[]): {
       } else item.currentRole = item.currentRole ?? "decision"
     }
   }
-  return { items: [...byKey.values()], homes }
+  return [...byKey.values()]
 }
 
 export function normalizeFirstmate(value: unknown, configuredHome: string, configuredRoot: string): FirstmateSnapshot {
@@ -647,7 +611,6 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
     diagnostic: [...new Set(diagnostic)].slice(0, 256),
     home: configuredHome,
     root: configuredRoot,
-    workItems: [...mainItems(configuredHome, generatedAt, backlog, tasks), ...remote.items],
-    homes: remote.homes,
+    workItems: [...mainItems(configuredHome, generatedAt, backlog, tasks), ...remote],
   }
 }

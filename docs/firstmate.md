@@ -14,7 +14,7 @@ OES_FIRSTMATE_ROOT="$HOME/path/to/firstmate-code" \
 opencode
 ```
 
-Home lookup uses `OES_FIRSTMATE_HOME`, then `FM_HOME`, then `FM_ROOT_OVERRIDE`. Root lookup uses `OES_FIRSTMATE_ROOT`, then `FM_ROOT_OVERRIDE`; otherwise the selected home must contain `bin/fm-fleet-snapshot.sh`. An explicit invalid path reports Firstmate as unavailable without affecting OpenCode. With no home variable, the integration is inert and starts no process or timer.
+Home lookup uses `OES_FIRSTMATE_HOME` only, and root lookup uses `OES_FIRSTMATE_ROOT` only; otherwise the selected home must contain `bin/fm-fleet-snapshot.sh`. Firstmate's own `FM_*` variables are never read as an opt-in, so an ambient Firstmate environment cannot enable the integration. An explicit invalid path reports Firstmate as unavailable without affecting OpenCode. With no home variable, the integration is inert and starts no process or timer.
 
 ## My work
 

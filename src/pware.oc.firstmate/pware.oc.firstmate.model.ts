@@ -30,8 +30,6 @@ export type FirstmateWorkItem = {
   captainActionable: boolean | null
   blockedByIds?: string[]
   unresolvedBlockerIds?: string[]
-  /** Kept for the compact UI contract. Same values as unresolvedBlockerIds. */
-  unresolvedBlockers: string[]
   provenance: string[]
   provenanceSelected?: string | null
   provenanceTrust?: string | null
@@ -39,7 +37,6 @@ export type FirstmateWorkItem = {
   freshness: FirstmateFreshness
   observedAt: number | null
   ageSeconds?: number | null
-  homeCounts?: Record<string, number> | null
   decisions?: FirstmateDecision[]
   warning?: string
 }
@@ -56,23 +53,6 @@ export type FirstmateDecision = {
   captainActionable: boolean
 }
 
-export type FirstmateHomeSummary = {
-  id: string
-  home: string | null
-  host: string | null
-  remote: boolean
-  currentState: string | null
-  currentReason: string | null
-  provenanceSelected: string | null
-  provenanceTrust: string | null
-  summarySource: string | null
-  sourceFreshness: string | null
-  observedAt: number | null
-  ageSeconds: number | null
-  counts: Record<string, number> | null
-  omitted: { surface: string | null; count: number | null }[]
-}
-
 export type FirstmateSnapshot = {
   availability: FirstmateAvailability
   completeness: FirstmateCompleteness
@@ -82,8 +62,6 @@ export type FirstmateSnapshot = {
   home: string
   root: string
   workItems: FirstmateWorkItem[]
-  /** Canonical registered-home summaries, including unavailable homes with no projected work. */
-  homes?: FirstmateHomeSummary[]
 }
 
 export function unavailableFirstmate(home: string, root: string, diagnostic: string): FirstmateSnapshot {
@@ -96,6 +74,5 @@ export function unavailableFirstmate(home: string, root: string, diagnostic: str
     home,
     root,
     workItems: [],
-    homes: [],
   }
 }

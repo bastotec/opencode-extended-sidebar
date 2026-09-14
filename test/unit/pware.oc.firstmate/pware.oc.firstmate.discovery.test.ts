@@ -38,6 +38,18 @@ describe("Firstmate safety boundaries", () => {
     ])
   })
 
+  test("ignores an ambient Firstmate environment and only opts in through OES variables", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "oes-firstmate-ambient-"))
+    try {
+      fs.mkdirSync(path.join(home, "bin"), { recursive: true })
+      fs.writeFileSync(path.join(home, "bin", "fm-fleet-snapshot.sh"), "#!/bin/sh\nprintf '{}'\n", { mode: 0o700 })
+      expect(discoverFirstmate({ FM_HOME: home, FM_ROOT_OVERRIDE: home }).configured).toBe(false)
+      expect(discoverFirstmate({ OES_FIRSTMATE_HOME: home })).toMatchObject({ configured: true, diagnostic: null })
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   test("rejects a resolved executable path through an unsafe intermediate directory", () => {
     const container = fs.mkdtempSync(path.join(os.tmpdir(), "oes-firstmate-chain-"))
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "oes-firstmate-home-"))

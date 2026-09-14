@@ -35,7 +35,6 @@ export type RuntimeSourceOptions = {
 export type RuntimeSourceHandle = {
   stop: () => void
   refresh: () => void
-  refreshFirstmate: () => void
   setSession: (sessionId: string) => void
 }
 
@@ -115,7 +114,6 @@ export function startRuntimeSource(opts: RuntimeSourceOptions): RuntimeSourceHan
 
   return {
     refresh: () => monitor.refresh(),
-    refreshFirstmate: () => firstmate?.refresh(),
     setSession: (sessionId: string) => {
       if (!sessionId || sessionId === watchedSessionId) return
       watchedSessionId = sessionId

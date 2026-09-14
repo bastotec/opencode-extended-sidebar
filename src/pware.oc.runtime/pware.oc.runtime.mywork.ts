@@ -66,13 +66,6 @@ export type MyWorkItem =
   | {
       kind: typeof MY_WORK_GROUP_FIRSTMATE
       work: FirstmateWorkItem
-      /** Compatibility fields keep exhaustive consumers safe until they render this discriminator explicitly. */
-      name: string
-      rel: string
-      pendingAction: null
-      updatedAt: number | null
-      sessionState: null
-      review: null
     }
   | {
       kind: typeof MY_WORK_GROUP_SESSIONS
@@ -240,16 +233,7 @@ export function toSessionItems(
 
 /** Build one detail-only row per canonical durable Firstmate work item. */
 export function toFirstmateItems(items: readonly FirstmateWorkItem[]): MyWorkItem[] {
-  return items.map((work) => ({
-    kind: MY_WORK_GROUP_FIRSTMATE,
-    work,
-    name: work.title ?? work.taskId,
-    rel: work.worktree ?? "",
-    pendingAction: null,
-    updatedAt: work.observedAt,
-    sessionState: null,
-    review: null,
-  }))
+  return items.map((work) => ({ kind: MY_WORK_GROUP_FIRSTMATE, work }))
 }
 
 /** Build pinned items from pinned session ids joined to their recent-session rows, in pin order; ids missing from `recent` are skipped. */

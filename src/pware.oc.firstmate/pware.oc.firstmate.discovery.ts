@@ -5,12 +5,8 @@ export type FirstmateConfiguration =
   | { configured: false }
   | { configured: true; home: string; root: string; executable: string; diagnostic: string | null }
 
-function explicit(env: NodeJS.ProcessEnv, names: readonly string[]): string | null {
-  for (const name of names) {
-    const value = env[name]?.trim()
-    if (value) return value
-  }
-  return null
+function explicit(env: NodeJS.ProcessEnv, name: string): string | null {
+  return env[name]?.trim() || null
 }
 
 function canonical(input: string): string {
@@ -63,10 +59,10 @@ export function trustedFirstmatePath(
 }
 
 export function discoverFirstmate(env: NodeJS.ProcessEnv = process.env): FirstmateConfiguration {
-  const selectedHome = explicit(env, ["OES_FIRSTMATE_HOME", "FM_HOME", "FM_ROOT_OVERRIDE"])
+  const selectedHome = explicit(env, "OES_FIRSTMATE_HOME")
   if (!selectedHome) return { configured: false }
   const home = canonical(selectedHome)
-  const explicitRoot = explicit(env, ["OES_FIRSTMATE_ROOT", "FM_ROOT_OVERRIDE"])
+  const explicitRoot = explicit(env, "OES_FIRSTMATE_ROOT")
   const root = canonical(explicitRoot ?? home)
   const executablePath = path.join(root, "bin", "fm-fleet-snapshot.sh")
   const unavailable = (diagnostic: string): FirstmateConfiguration => ({
