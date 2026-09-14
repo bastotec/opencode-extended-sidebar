@@ -39,6 +39,8 @@ import {
   readTextPreview,
 } from "../pware.oc.core/pware.oc.core.preview.js"
 import { formatAge, formatDuration, formatRate, formatWhen } from "../pware.oc.core/pware.oc.core.pulse.js"
+import type { FirstmateWorkItem } from "../pware.oc.firstmate/pware.oc.firstmate.model.js"
+import { firstmateDetailLines, firstmateRow } from "./pware.oc.ui.firstmate.js"
 
 function hostDialogSize(api: TuiPluginApi): HostDialogSize {
   try {
@@ -407,6 +409,44 @@ export function openToolDetail(api: TuiPluginApi, tool: ToolView, colors: ThemeC
       <DetailLine text={`Status: ${tool.status}`} colors={colors} muted />
     </DialogPad>
   ))
+}
+
+/** A Firstmate row is an inventory record, so its only dialog is read-only facts. */
+export function openFirstmateDetail(api: TuiPluginApi, work: FirstmateWorkItem, colors: ThemeColors): void {
+  const title = `Firstmate · ${work.taskId || "task"}`
+  const lines = firstmateDetailLines(work)
+  const Detail = (): JSX.Element => {
+    const dimensions = useTerminalDimensions()
+    const rows = createMemo(() => previewViewportRows(dimensions().height, 2))
+    return (
+      <DialogPad>
+        <DialogHeader title={title} colors={colors} onClose={() => closeDialog(api)} />
+        {divider(colors)}
+        <scrollbox scrollY focused height={rows()} maxHeight={rows()}>
+          <For each={lines}>{(line) => <DetailLine text={line} colors={colors} muted />}</For>
+        </scrollbox>
+      </DialogPad>
+    )
+  }
+  openDialog(api, "medium", () => <Detail />)
+}
+
+/** Read-only inventory picker used when the sidebar cannot spare work rows. */
+export function openFirstmateList(
+  api: TuiPluginApi,
+  workItems: readonly FirstmateWorkItem[],
+  colors: ThemeColors,
+): void {
+  const options: TuiDialogSelectOption<string>[] = workItems.map((work, index) => {
+    const row = firstmateRow(work)
+    return {
+      title: row.name,
+      value: String(index),
+      description: [row.suffix, row.context].filter(Boolean).join(" · ") || undefined,
+      onSelect: () => openFirstmateDetail(api, work, colors),
+    }
+  })
+  openDialog(api, "medium", () => <api.ui.DialogSelect title="Firstmate" options={options} />)
 }
 
 /**

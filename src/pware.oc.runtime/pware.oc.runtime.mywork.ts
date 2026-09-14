@@ -12,6 +12,7 @@ import type {
 } from "../pware.oc.opencode/resolver/pware.oc.opencode.resolver.session.js"
 import type { ReviewState } from "../pware.oc.omo/resolver/pware.oc.omo.resolver.plan.js"
 import type { EnrichedApproval } from "./pware.oc.runtime.mywork-enrich.js"
+import type { FirstmateWorkItem } from "../pware.oc.firstmate/pware.oc.firstmate.model.js"
 import {
   MY_WORK_GROUP_DISMISSED,
   MY_WORK_GROUP_DRAFT_DOCS,
@@ -22,6 +23,7 @@ import {
   MY_WORK_GROUP_READY_REVIEW,
   MY_WORK_GROUP_READY_START,
   MY_WORK_GROUP_SESSIONS,
+  MY_WORK_GROUP_FIRSTMATE,
   type ApprovalGroupKind,
 } from "../pware.oc.core/constants/pware.oc.core.constants.myWork.js"
 import { isDraftOf, resolveApprovalGroup } from "../pware.oc.omo/resolver/pware.oc.omo.resolver.approvalGroup.js"
@@ -62,6 +64,17 @@ export type MyWorkItem =
       review: ReviewState | null
     }
   | {
+      kind: typeof MY_WORK_GROUP_FIRSTMATE
+      work: FirstmateWorkItem
+      /** Compatibility fields keep exhaustive consumers safe until they render this discriminator explicitly. */
+      name: string
+      rel: string
+      pendingAction: null
+      updatedAt: number | null
+      sessionState: null
+      review: null
+    }
+  | {
       kind: typeof MY_WORK_GROUP_SESSIONS
       sessionId: string
       title: string
@@ -95,6 +108,7 @@ export const MY_WORK_ORDER: readonly MyWorkKind[] = [
   QUESTION_KIND_QUESTION,
   QUESTION_KIND_INTERRUPTED,
   QUESTION_KIND_ERROR,
+  MY_WORK_GROUP_FIRSTMATE,
   MY_WORK_GROUP_SESSIONS,
   MY_WORK_GROUP_READY_REVIEW,
   MY_WORK_GROUP_READY_START,
@@ -110,6 +124,7 @@ const MY_WORK_LABELS: Record<MyWorkKind, string> = {
   [QUESTION_KIND_QUESTION]: "Awaiting answer",
   [QUESTION_KIND_INTERRUPTED]: "Interrupted",
   [QUESTION_KIND_ERROR]: "Errors",
+  [MY_WORK_GROUP_FIRSTMATE]: "Firstmate",
   [MY_WORK_GROUP_SESSIONS]: "Sessions",
   [MY_WORK_GROUP_READY_REVIEW]: "Ready to review",
   [MY_WORK_GROUP_READY_START]: "Ready to start",
@@ -220,6 +235,20 @@ export function toSessionItems(
     title: s.title,
     status: s.status,
     timeUpdated: s.timeUpdated,
+  }))
+}
+
+/** Build one detail-only row per canonical durable Firstmate work item. */
+export function toFirstmateItems(items: readonly FirstmateWorkItem[]): MyWorkItem[] {
+  return items.map((work) => ({
+    kind: MY_WORK_GROUP_FIRSTMATE,
+    work,
+    name: work.title ?? work.taskId,
+    rel: work.worktree ?? "",
+    pendingAction: null,
+    updatedAt: work.observedAt,
+    sessionState: null,
+    review: null,
   }))
 }
 

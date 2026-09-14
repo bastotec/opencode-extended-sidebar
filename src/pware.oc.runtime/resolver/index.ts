@@ -31,6 +31,7 @@ import {
   type OmoSnapshot,
 } from "../../pware.oc.omo/resolver/index.js"
 import { enrichDelegates, type DelegateView } from "./pware.oc.runtime.resolver.delegate.js"
+import type { FirstmateSnapshot } from "../../pware.oc.firstmate/pware.oc.firstmate.model.js"
 
 export * from "./pware.oc.runtime.resolver.delegate.js"
 
@@ -45,6 +46,8 @@ export type RuntimeSnapshot = {
   delegates: DelegateView[]
   /** Open `question` tools across the project — computed off the UI thread. */
   openQuestions: OpenQuestion[]
+  /** Independently-polled durable fleet inventory. Absent when Firstmate is not explicitly configured. */
+  firstmate?: FirstmateSnapshot
 }
 
 /** Cheap poll key: WAL + omo/oes stamps. No git, no boulder JSON. */

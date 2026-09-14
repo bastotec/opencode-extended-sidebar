@@ -3,6 +3,7 @@ import { EVENT_SCAN_DEBOUNCE_MS } from "../pware.oc.core/pware.oc.core.timing.js
 import {
   EV_OES_QUESTION_HINT,
   EV_OES_REFRESH_HINT,
+  EV_OES_SNAPSHOT,
 } from "../pware.oc.core/constants/pware.oc.core.constants.eventName.js"
 import {
   EV_OMO_BOULDER_CHANGED,
@@ -11,6 +12,13 @@ import {
 } from "../pware.oc.omo/constants/pware.oc.omo.constants.eventName.js"
 import { startMonitor, type MonitorHandle } from "./pware.oc.runtime.monitor.js"
 import { shutdownSnapshotWorker } from "./pware.oc.runtime.snapshotClient.js"
+import {
+  startFirstmatePoller,
+  type FirstmatePollerHandle,
+  type FirstmatePollerOptions,
+} from "../pware.oc.firstmate/pware.oc.firstmate.poller.js"
+import type { FirstmateSnapshot } from "../pware.oc.firstmate/pware.oc.firstmate.model.js"
+import type { RuntimeSnapshot } from "./resolver/index.js"
 
 export type RuntimeSourceOptions = {
   bus: PwareEventBus
@@ -18,12 +26,24 @@ export type RuntimeSourceOptions = {
   projectRoot: string | null
   dbPath?: string
   pollMs?: number
+  firstmatePollMs?: number
+  env?: NodeJS.ProcessEnv
+  monitorFactory?: (options: Parameters<typeof startMonitor>[0]) => MonitorHandle
+  firstmatePollerFactory?: (options: FirstmatePollerOptions) => FirstmatePollerHandle | null
 }
 
 export type RuntimeSourceHandle = {
   stop: () => void
   refresh: () => void
+  refreshFirstmate: () => void
   setSession: (sessionId: string) => void
+}
+
+export function withFirstmateSnapshot(
+  host: RuntimeSnapshot,
+  firstmate: FirstmateSnapshot | null,
+): RuntimeSnapshot {
+  return firstmate ? { ...host, firstmate } : host
 }
 
 export function startRuntimeSource(opts: RuntimeSourceOptions): RuntimeSourceHandle {
@@ -32,17 +52,36 @@ export function startRuntimeSource(opts: RuntimeSourceOptions): RuntimeSourceHan
   let debounce: ReturnType<typeof setTimeout> | null = null
   let questionDebounce: ReturnType<typeof setTimeout> | null = null
   let pendingQuestionSession: string | null = null
+  let hostSnapshot: RuntimeSnapshot | null = null
+  let firstmateSnapshot: FirstmateSnapshot | null = null
+
+  const publish = (): void => {
+    if (stopped || !hostSnapshot) return
+    const snapshot = withFirstmateSnapshot(hostSnapshot, firstmateSnapshot)
+    opts.bus.emit({ type: EV_OES_SNAPSHOT, ts: Date.now(), data: { snapshot } })
+  }
 
   const bindMonitor = (sessionId: string): MonitorHandle =>
-    startMonitor({
+    (opts.monitorFactory ?? startMonitor)({
       sessionId,
       projectRoot: opts.projectRoot,
       dbPath: opts.dbPath,
       pollMs: opts.pollMs,
-      emit: opts.bus.emit,
+      onChange: (snapshot) => {
+        hostSnapshot = snapshot
+        publish()
+      },
     })
 
   let monitor = bindMonitor(watchedSessionId)
+  const firstmate: FirstmatePollerHandle | null = (opts.firstmatePollerFactory ?? startFirstmatePoller)({
+    env: opts.env,
+    pollMs: opts.firstmatePollMs,
+    onSnapshot: (snapshot) => {
+      firstmateSnapshot = snapshot
+      publish()
+    },
+  })
 
   const scheduleRefresh = (): void => {
     if (stopped) return
@@ -76,9 +115,11 @@ export function startRuntimeSource(opts: RuntimeSourceOptions): RuntimeSourceHan
 
   return {
     refresh: () => monitor.refresh(),
+    refreshFirstmate: () => firstmate?.refresh(),
     setSession: (sessionId: string) => {
       if (!sessionId || sessionId === watchedSessionId) return
       watchedSessionId = sessionId
+      hostSnapshot = null
       if (debounce) {
         clearTimeout(debounce)
         debounce = null
@@ -99,6 +140,7 @@ export function startRuntimeSource(opts: RuntimeSourceOptions): RuntimeSourceHan
       offDocsChanged()
       offConfigChanged()
       monitor.stop()
+      firstmate?.stop()
       shutdownSnapshotWorker()
     },
   }

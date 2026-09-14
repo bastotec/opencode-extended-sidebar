@@ -20,6 +20,7 @@ import {
   myWorkLabel,
   toApprovalItems,
   toDraftDocItems,
+  toFirstmateItems,
   toPlanItems,
   toPinnedItems,
   toQuestionItems,
@@ -90,6 +91,7 @@ import {
   MY_WORK_GROUP_READY_REVIEW,
   MY_WORK_GROUP_READY_START,
   MY_WORK_GROUP_SESSIONS,
+  MY_WORK_GROUP_FIRSTMATE,
 } from "../pware.oc.core/constants/pware.oc.core.constants.myWork.js"
 import { DOC_KIND_DRAFT, DOC_KIND_PLAN } from "../pware.oc.omo/constants/pware.oc.omo.constants.docKind.js"
 import {
@@ -144,8 +146,9 @@ import {
 } from "../pware.oc.core/pware.oc.core.status.js"
 import { createEventBus } from "../pware.oc.core/pware.oc.core.bus.js"
 import { startRuntimeSource } from "../pware.oc.runtime/pware.oc.runtime.source.js"
-import { openApprovalDialog, openDocDetail, openFileDetail, openFileListDialog, openQuestionDialog, openRealtimeCharts, openToolDetail } from "./pware.oc.ui.menudialogs.js"
+import { openApprovalDialog, openDocDetail, openFileDetail, openFileListDialog, openFirstmateDetail, openFirstmateList, openQuestionDialog, openRealtimeCharts, openToolDetail } from "./pware.oc.ui.menudialogs.js"
 import { startHostEventBridge } from "./pware.oc.ui.live.js"
+import { firstmateNotice, firstmateRow, firstmateSection } from "./pware.oc.ui.firstmate.js"
 import {
   approvePlan,
   openNewSessionPrompt,
@@ -267,7 +270,9 @@ export function SidebarPanel(props: SidebarProps): JSX.Element {
     rootBox = node
     node.onSizeChange = () => {
       const w = node.width
-      if (Number.isFinite(w) && w > 0) setLineWidth(Math.max(ROW_LINE_FALLBACK, w - ROW_LINE_RESERVE))
+      // The fallback is only for pre-layout. Once measured, honor even a very
+      // narrow sidebar so clipped rows never wrap into the next line.
+      if (Number.isFinite(w) && w > 0) setLineWidth(Math.max(1, Math.floor(w) - ROW_LINE_RESERVE))
     }
   }
   const lineMax = (): number => lineWidth()
@@ -895,14 +900,35 @@ export function SidebarPanel(props: SidebarProps): JSX.Element {
     return toSessionItems(snap().db.recent.filter((s) => !pinned.has(s.id)))
   })
 
+  /** Durable Firstmate inventory stays visible independently of live OpenCode sessions. */
+  const myWorkFirstmate = createMemo<MyWorkItem[]>(() => {
+    if (tab() !== "mywork" || coldTab() === "mywork") return []
+    const firstmate = snap().firstmate
+    return firstmate ? toFirstmateItems(firstmate.workItems) : []
+  })
+
   const myWorkItems = createMemo<MyWorkItem[]>(() => [
     ...myWorkPinned(),
     ...myWorkQuestions(),
+    ...myWorkFirstmate(),
     ...myWorkRunning(),
     ...myWorkApprovals(),
   ])
 
-  const myWorkGroups = createMemo(() => groupMyWork(myWorkItems()))
+  const myWorkGroups = createMemo(() => {
+    const groups = groupMyWork(myWorkItems())
+    // A configured inventory gets one durable home even before it has rows (or
+    // when its only visible result is a compact health notice). No snapshot,
+    // no new group — preserving the existing sidebar byte-for-byte.
+    if (snap().firstmate && !groups.some((group) => group.kind === MY_WORK_GROUP_FIRSTMATE)) {
+      const sessionsAt = groups.findIndex((group) => group.kind === MY_WORK_GROUP_SESSIONS)
+      groups.splice(sessionsAt < 0 ? groups.length : sessionsAt, 0, {
+        kind: MY_WORK_GROUP_FIRSTMATE,
+        items: [],
+      })
+    }
+    return groups
+  })
 
   /** My-work tab light — one scan pipeline for every tab (see `maybeScanBadge`). */
   const [myWorkAttn, setMyWorkAttn] = createSignal<readonly TabAttentionItem[]>([])
@@ -994,7 +1020,12 @@ export function SidebarPanel(props: SidebarProps): JSX.Element {
         for (const g of myWorkGroups()) {
           const fold = myWorkFold[g.kind]
           if (!fold) continue
-          section(!fold.open(), `mywork.${g.kind}`, g.items.length, g.items.length > 0 ? ROW_MIN.mywork : 0, ROW_RANK.mywork)
+          // A degraded Firstmate snapshot spends one of the same content rows
+          // as durable work, rather than slipping an unbudgeted notice below
+          // the fold header.
+          const noticeRows = g.kind === MY_WORK_GROUP_FIRSTMATE && firstmateNotice(snap().firstmate) ? 1 : 0
+          const contentRows = g.items.length + noticeRows
+          section(!fold.open(), `mywork.${g.kind}`, contentRows, contentRows > 0 ? ROW_MIN.mywork : 0, ROW_RANK.mywork)
         }
       } else {
         // Perf lays out its own sections and caps itself with `perfRows` in
@@ -1047,6 +1078,20 @@ export function SidebarPanel(props: SidebarProps): JSX.Element {
   }
 
   const myWorkRow = (item: MyWorkItem): RowData => {
+    // Firstmate is intentionally ahead of the generic `sessionId` branch:
+    // inventory rows always open their read-only details, never a session.
+    if (item.kind === MY_WORK_GROUP_FIRSTMATE) {
+      const row = firstmateRow(item.work)
+      return {
+        kind: ROW_KIND_AGENT,
+        name: row.name,
+        title: row.context,
+        suffix: row.suffix,
+        glyph: row.glyph,
+        bodyTone: row.bodyTone,
+        onSelect: () => openFirstmateDetail(props.api, item.work, colors()),
+      }
+    }
     if (item.kind === MY_WORK_GROUP_SESSIONS || item.kind === MY_WORK_GROUP_PINNED) {
       const isBusy = Boolean(item.sessionId && busy()[item.sessionId])
       const keep =
@@ -1382,26 +1427,69 @@ export function SidebarPanel(props: SidebarProps): JSX.Element {
               return (
                 <box flexDirection="column" gap={1}>
                   <For each={groups}>
-                    {(g) => (
-                      <GroupSection
-                        title={myWorkLabel(g.kind)}
-                        open={myWorkFold[g.kind].open()}
-                        onToggle={myWorkFold[g.kind].toggle}
-                        colors={colors()}
-                        items={g.items}
-                        budget={rowsFor(`mywork.${g.kind}`, 2)}
-                        reveal={myWorkReveal[g.kind]}
-                        actions={
-                          g.kind === MY_WORK_GROUP_SESSIONS
-                            ? [
-                                { label: "switch", onPick: () => openSessionSwitcher(props.api) },
-                                { label: "new", onPick: () => openNewSessionPrompt(props.api) },
-                              ]
-                            : undefined
-                        }
-                        renderItem={(item) => <Row {...myWorkRow(item)} />}
-                      />
-                    )}
+                    {(g) => {
+                      const notice = () =>
+                        g.kind === MY_WORK_GROUP_FIRSTMATE ? firstmateNotice(snap().firstmate) : null
+                      const budget = () => rowsFor(`mywork.${g.kind}`, 2)
+                      const firstmateRows = () => firstmateSection(budget(), Boolean(notice()), g.items.length)
+                      const firstmateWork = () =>
+                        g.items.flatMap((item) =>
+                          item.kind === MY_WORK_GROUP_FIRSTMATE ? [item.work] : [],
+                        )
+                      return g.kind === MY_WORK_GROUP_FIRSTMATE ? (
+                        <FoldSection
+                          title="Firstmate"
+                          count={g.items.length || undefined}
+                          open={myWorkFold[g.kind].open()}
+                          onToggle={myWorkFold[g.kind].toggle}
+                          colors={colors()}
+                          actions={
+                            firstmateRows().showList
+                              ? [{ label: "view all", onPick: () => openFirstmateList(props.api, firstmateWork(), colors()) }]
+                              : undefined
+                          }
+                        >
+                          <Show when={firstmateRows().show}>
+                            <Show when={firstmateRows().showNotice && notice()}>{(item) => (
+                              <Row
+                                kind={ROW_KIND_GROUP}
+                                name={item().label}
+                                glyph={item().glyph}
+                                bodyTone="textMuted"
+                              />
+                            )}</Show>
+                            <Show when={firstmateRows().workRows > 0}>
+                              <RowList
+                                items={g.items}
+                                budget={firstmateRows().workRows + myWorkReveal[g.kind].more()}
+                                colors={colors()}
+                                renderItem={(item) => <Row {...myWorkRow(item)} />}
+                                more={{ onReveal: myWorkReveal[g.kind].reveal }}
+                              />
+                            </Show>
+                          </Show>
+                        </FoldSection>
+                      ) : (
+                        <GroupSection
+                          title={myWorkLabel(g.kind)}
+                          open={myWorkFold[g.kind].open()}
+                          onToggle={myWorkFold[g.kind].toggle}
+                          colors={colors()}
+                          items={g.items}
+                          budget={budget()}
+                          reveal={myWorkReveal[g.kind]}
+                          actions={
+                            g.kind === MY_WORK_GROUP_SESSIONS
+                              ? [
+                                  { label: "switch", onPick: () => openSessionSwitcher(props.api) },
+                                  { label: "new", onPick: () => openNewSessionPrompt(props.api) },
+                                ]
+                              : undefined
+                          }
+                          renderItem={(item) => <Row {...myWorkRow(item)} />}
+                        />
+                      )
+                    }}
                   </For>
                 </box>
               )
