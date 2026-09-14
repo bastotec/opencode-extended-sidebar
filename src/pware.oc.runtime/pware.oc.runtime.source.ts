@@ -12,6 +12,7 @@ import {
 } from "../pware.oc.omo/constants/pware.oc.omo.constants.eventName.js"
 import { startMonitor, type MonitorHandle } from "./pware.oc.runtime.monitor.js"
 import { shutdownSnapshotWorker } from "./pware.oc.runtime.snapshotClient.js"
+import { shutdownFirstmateWorker } from "../pware.oc.firstmate/pware.oc.firstmate.normalizeClient.js"
 import {
   startFirstmatePoller,
   type FirstmatePollerHandle,
@@ -68,6 +69,7 @@ export function startRuntimeSource(opts: RuntimeSourceOptions): RuntimeSourceHan
         hostSnapshot = snapshot
         publish()
       },
+      onBoulderChange: () => opts.bus.emit({ type: EV_OMO_BOULDER_CHANGED, ts: Date.now(), data: {} }),
     })
 
   let monitor = bindMonitor(watchedSessionId)
@@ -135,6 +137,7 @@ export function startRuntimeSource(opts: RuntimeSourceOptions): RuntimeSourceHan
       offConfigChanged()
       monitor.stop()
       firstmate?.stop()
+      shutdownFirstmateWorker()
       shutdownSnapshotWorker()
     },
   }

@@ -1,6 +1,6 @@
 import { discoverFirstmate, type FirstmateConfiguration } from "./pware.oc.firstmate.discovery.js"
 import { runFirstmateCommand, type FirstmateCommandResult } from "./pware.oc.firstmate.command.js"
-import { normalizeFirstmate } from "./pware.oc.firstmate.normalize.js"
+import { normalizeFirstmateAsync } from "./pware.oc.firstmate.normalizeClient.js"
 import { unavailableFirstmate, type FirstmateSnapshot } from "./pware.oc.firstmate.model.js"
 
 export const FIRSTMATE_POLL_MS = 30_000
@@ -53,19 +53,19 @@ export function startFirstmatePoller(options: FirstmatePollerOptions): Firstmate
     if (timer) clearTimeout(timer)
     timer = null
     controller = new AbortController()
-    void run(config, { signal: controller.signal }).then((result) => {
+    void run(config, { signal: controller.signal }).then(async (result) => {
       if (stopped) return
       let snapshot: FirstmateSnapshot
       if (!result.ok) {
         snapshot = failureSnapshot(config, lastGood)
       } else {
         try {
-          snapshot = normalizeFirstmate(JSON.parse(result.stdout), config.home, config.root)
-          lastGood = snapshot
+          snapshot = await normalizeFirstmateAsync(result.stdout, config.home, config.root)
         } catch {
           snapshot = failureSnapshot(config, lastGood)
         }
       }
+      if (stopped) return
       if (snapshot.availability === "available") lastGood = snapshot
       options.onSnapshot(snapshot)
     }).catch(() => {

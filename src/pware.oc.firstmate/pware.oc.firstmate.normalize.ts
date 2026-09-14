@@ -289,6 +289,8 @@ function sanitizeSecondmateRecords(value: unknown): { records: JsonObject[]; par
   return { records, partial }
 }
 
+type Projection = { items: FirstmateWorkItem[]; observations: FirstmateFreshness[] }
+
 function emptyItem(home: string, taskId: string): FirstmateWorkItem {
   return {
     home,
@@ -327,13 +329,14 @@ function emptyItem(home: string, taskId: string): FirstmateWorkItem {
   }
 }
 
-function mainItems(home: string, backlog: JsonObject, tasks: JsonObject[]): FirstmateWorkItem[] {
+function mainItems(home: string, backlog: JsonObject, tasks: JsonObject[]): Projection {
   const backlogRows = objects(backlog.records)
   const structured = backlogRows.filter((row) => row.structured === true && text(row.id))
   const backlogById = new Map(structured.map((row) => [text(row.id)!, row]))
   const taskById = new Map(tasks.map((row) => [text(row.id)!, row]))
   const ids = [...backlogById.keys(), ...[...taskById.keys()].filter((id) => !backlogById.has(id))]
-  const out: FirstmateWorkItem[] = []
+  const items: FirstmateWorkItem[] = []
+  const observations: FirstmateFreshness[] = []
   for (const id of ids) {
     const durable = backlogById.get(id)
     const task = taskById.get(id)
@@ -374,13 +377,15 @@ function mainItems(home: string, backlog: JsonObject, tasks: JsonObject[]): Firs
       observedAt,
     })
     if (!durable && task) item.warning = "Task metadata has no canonical backlog record"
-    out.push(item)
+    if (task) observations.push(fresh(sourceFreshness))
+    items.push(item)
   }
-  return out
+  return { items, observations }
 }
 
-function secondmateItems(records: JsonObject[]): FirstmateWorkItem[] {
+function secondmateItems(records: JsonObject[]): Projection {
   const byKey = new Map<string, FirstmateWorkItem>()
+  const observations: FirstmateFreshness[] = []
   const get = (home: string, host: string | null, remote: boolean, id: string): FirstmateWorkItem => {
     const key = `${remote ? `remote:${host ?? "unknown"}` : "local"}\0${home}\0${id}`
     let item = byKey.get(key)
@@ -407,6 +412,7 @@ function secondmateItems(records: JsonObject[]): FirstmateWorkItem[] {
     const ageSeconds = finite(freshness?.age_seconds)
     const reason = text(current?.reason)
     if (!home || selected !== "structured-home") continue
+    observations.push(fresh(sourceFreshness))
     const applyCommon = (item: FirstmateWorkItem, surface: string): void => {
       item.provenance = [...new Set([...item.provenance, `secondmate-${surface}`])]
       item.provenanceSelected = selected
@@ -495,22 +501,17 @@ function secondmateItems(records: JsonObject[]): FirstmateWorkItem[] {
       } else item.currentRole = item.currentRole ?? "decision"
     }
   }
-  return [...byKey.values()]
+  return { items: [...byKey.values()], observations }
 }
 
 export function normalizeFirstmate(value: unknown, configuredHome: string, configuredRoot: string): FirstmateSnapshot {
   const { backlog, tasks, main, current, landed, generatedAt } = validateEnvelope(value, configuredHome, configuredRoot)
   let partial = false
-  const observations: FirstmateFreshness[] = []
 
   if (backlog.present !== true) partial = true
   if (main.valid !== true) partial = true
   if (requiredNumber(main, "unstructured_current_count") > 0) partial = true
   if (requiredArray(main, "orphan_in_flight").length > 0) partial = true
-
-  for (const task of tasks) {
-    observations.push(fresh(text(object(task.current_state)?.freshness)))
-  }
 
   const registry = requiredObject(current, "registry")
   const registryReasons = strings(registry.reasons)
@@ -539,12 +540,11 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
   if (sanitized.partial) partial = true
   const currentRecords = sanitized.records
   const remote = secondmateItems(currentRecords)
+  const durable = mainItems(configuredHome, backlog, tasks)
   for (const summary of currentRecords) {
     const provenance = object(summary.provenance)
-    const status = text(object(summary.freshness)?.status)
     if (text(provenance?.selected) !== "structured-home" || text(provenance?.trust) !== "complete") partial = true
     if (objects(summary.omitted).some((entry) => (finite(entry.count) ?? 0) > 0)) partial = true
-    observations.push(fresh(status))
   }
   for (const key of ["truncated", "unreadable", "partial"]) {
     if (strings(landed[key]).length) partial = true
@@ -553,10 +553,10 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
   return {
     availability: "available",
     completeness: partial ? "partial" : "complete",
-    freshness: overallFreshness(observations),
+    freshness: overallFreshness([...durable.observations, ...remote.observations]),
     observedAt: generatedAt,
     home: configuredHome,
     root: configuredRoot,
-    workItems: [...mainItems(configuredHome, backlog, tasks), ...remote],
+    workItems: [...durable.items, ...remote.items],
   }
 }

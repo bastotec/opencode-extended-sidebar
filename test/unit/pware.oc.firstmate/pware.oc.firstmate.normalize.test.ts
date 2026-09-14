@@ -169,6 +169,31 @@ describe("normalizeFirstmate", () => {
     expect(normalizeFirstmate(stale, "/tmp/fm-home", "/tmp/fm-root").freshness).toBe("stale")
   })
 
+  test("ignores freshness from producer rows the projection never renders", () => {
+    const hidden = structuredClone(fixture)
+    hidden.tasks.push({
+      id: "done1", kind: "ship", harness: "opencode", project: "alpha", backend: "tmux",
+      current_state: { state: "working", source: "pane", detail: "", raw: "", observed_at: "2026-09-13T10:00:00Z", freshness: "cached" },
+      paths: { worktree: { path: "/tmp/fm-home/projects/done1", present: true } },
+    })
+    const unreadable = structuredClone(hidden.secondmate_current.records[0])
+    unreadable.id = "mate-unstructured"
+    unreadable.home = "/srv/mate-unstructured"
+    unreadable.host = "host-unstructured"
+    unreadable.provenance.selected = "parent-event-fallback"
+    unreadable.freshness.status = "cached"
+    hidden.secondmate_current.records.push(unreadable)
+    hidden.secondmate_current.total_registered = 2
+    hidden.secondmate_current.total = 2
+    hidden.secondmate_current.shown = 2
+
+    const snapshot = normalizeFirstmate(hidden, "/tmp/fm-home", "/tmp/fm-root")
+    expect(snapshot.workItems.some((item) => item.taskId === "done1")).toBe(false)
+    expect(snapshot.workItems.some((item) => item.home === "/srv/mate-unstructured")).toBe(false)
+    expect(snapshot.workItems.every((item) => item.freshness !== "stale")).toBe(true)
+    expect(snapshot.freshness).toBe("fresh")
+  })
+
   test("reports unknown aggregate freshness when the producer observed nothing", () => {
     const unobserved = structuredClone(fixture)
     unobserved.tasks = []

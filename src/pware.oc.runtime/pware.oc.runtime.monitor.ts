@@ -3,9 +3,6 @@
  */
 import fs from "node:fs"
 import path from "node:path"
-import type { PwareEvent } from "../pware.oc.core/pware.oc.core.bus.js"
-import { EV_OES_SNAPSHOT } from "../pware.oc.core/constants/pware.oc.core.constants.eventName.js"
-import { EV_OMO_BOULDER_CHANGED } from "../pware.oc.omo/constants/pware.oc.omo.constants.eventName.js"
 import { findBoulder } from "../pware.oc.omo/resolver/index.js"
 import { computeFingerprint, type RuntimeSnapshot } from "./resolver/index.js"
 import { readRuntimeSnapshotAsync } from "./pware.oc.runtime.snapshotClient.js"
@@ -19,7 +16,7 @@ export type MonitorOptions = {
   dbPath?: string
   pollMs?: number
   onChange?: (snap: RuntimeSnapshot) => void
-  emit?: (evt: PwareEvent) => void
+  onBoulderChange?: () => void
 }
 
 export type MonitorHandle = {
@@ -61,11 +58,6 @@ export function startMonitor(opts: MonitorOptions): MonitorHandle {
       }).then((snapshot) => {
         if (stopped || gen !== emitGen) return
         opts.onChange?.(snapshot)
-        opts.emit?.({
-          type: EV_OES_SNAPSHOT,
-          ts: Date.now(),
-          data: { snapshot },
-        })
       })
     })
 
@@ -90,11 +82,7 @@ export function startMonitor(opts: MonitorOptions): MonitorHandle {
       try {
         watchers.push(
           fs.watch(boulderPath, { persistent: false }, () => {
-            opts.emit?.({
-              type: EV_OMO_BOULDER_CHANGED,
-              ts: Date.now(),
-              data: {},
-            })
+            opts.onBoulderChange?.()
             schedule()
           }),
         )

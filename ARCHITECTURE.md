@@ -114,6 +114,8 @@ src/
 │   ├── pware.oc.firstmate.discovery.ts
 │   ├── pware.oc.firstmate.normalize.ts
 │   ├── pware.oc.firstmate.command.ts
+│   ├── pware.oc.firstmate.worker.ts
+│   ├── pware.oc.firstmate.normalizeClient.ts
 │   └── pware.oc.firstmate.poller.ts
 ├── pware.oc.runtime/                      # runtime composition: OpenCode + optional domains
 │   ├── index.ts
@@ -298,6 +300,8 @@ slot (order 320) rendering `<SidebarPanel/>`. Referenced by
 | `discovery.ts` | explicit environment lookup, path checks, sanitized command environment | `discoverFirstmate()`, `firstmateCommandEnv()` |
 | `normalize.ts` | `fm-fleet-snapshot.v1` validation, canonical backlog/task union, and remote host/home/task identity | `normalizeFirstmate()` |
 | `command.ts` | fixed argv direct subprocess with deadline, output bounds, and bounded direct-child TERM/KILL cleanup | `runFirstmateCommand()` |
+| `worker.ts` | Bun Worker entry parsing and normalizing a payload off the TUI main thread | (worker entry) |
+| `normalizeClient.ts` | async normalize client: lazy singleton worker + host-process fallback | `normalizeFirstmateAsync()`, `shutdownFirstmateWorker()` |
 | `poller.ts` | completion-based polling and same-home last-good retention | `startFirstmatePoller()`, `FirstmatePollerHandle` |
 
 `fm-fleet-snapshot.v1` is the only Firstmate data boundary. This domain never
@@ -317,7 +321,7 @@ output readers if inherited pipes remain open after the subprocess exits.
 
 | Module | Responsibility | Key exports |
 |---|---|---|
-| `pware.oc.runtime.monitor.ts` | watch boulder + poll SQLite stamps, fingerprint-driven; emits snapshot + boulder-change events (snapshot read is off-thread via `snapshotClient`) | `startMonitor()`, `MonitorHandle` |
+| `pware.oc.runtime.monitor.ts` | watch boulder + poll SQLite stamps, fingerprint-driven; reports snapshots through `onChange` and boulder writes through `onBoulderChange` (snapshot read is off-thread via `snapshotClient`) | `startMonitor()`, `MonitorHandle` |
 | `pware.oc.runtime.source.ts` | runtime source orchestration: host monitor lifecycle, debounced hints, and optional Firstmate peer poller; shuts both sources down on stop | `startRuntimeSource()`, `RuntimeSourceHandle`, `withFirstmateSnapshot()` |
 | `pware.oc.runtime.worker.ts` | Bun Worker entry running `readRuntimeSnapshot` off the TUI main thread | (worker entry) |
 | `pware.oc.runtime.snapshotClient.ts` | async snapshot client: lazy singleton worker + paced host-process gateway fallback | `readRuntimeSnapshotAsync()`, `shutdownSnapshotWorker()`, `SnapshotRequestOpts` |

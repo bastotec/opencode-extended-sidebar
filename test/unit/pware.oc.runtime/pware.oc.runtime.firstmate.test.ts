@@ -40,6 +40,7 @@ describe("Firstmate runtime source composition", () => {
     let fleetStops = 0
     let monitorRefreshes = 0
     let monitorStops = 0
+    const boulderNotifiers: (() => void)[] = []
     const sessions: string[] = []
     const source = startRuntimeSource({
       bus,
@@ -47,6 +48,7 @@ describe("Firstmate runtime source composition", () => {
       projectRoot: null,
       monitorFactory: (options) => {
         sessions.push(options.sessionId)
+        if (options.onBoulderChange) boulderNotifiers.push(options.onBoulderChange)
         options.onChange?.(host(options.sessionId, options.sessionId === "two" ? "db read failed" : null))
         return {
           refresh: () => { monitorRefreshes++ },
@@ -74,6 +76,9 @@ describe("Firstmate runtime source composition", () => {
     expect(fleetStarts).toBe(1)
     expect(published.at(-1)?.db.error).toBe("db read failed")
     expect(published.at(-1)?.firstmate?.home).toBe("/tmp/home")
+    for (const notify of boulderNotifiers) notify()
+    await Bun.sleep(120)
+    expect(monitorRefreshes).toBe(3)
     source.stop()
     expect(monitorStops).toBe(2)
     expect(fleetStops).toBe(1)
