@@ -380,6 +380,38 @@ describe("groupMyWork", () => {
     ])
   })
 
+  const liveSession: MyWorkItem = {
+    kind: "sessions", sessionId: "ses_live", title: "Active", status: "running", timeUpdated: 3_000,
+  }
+  const durableWork: MyWorkItem = { kind: "firstmate", work: {
+    home: "/tmp/fm", taskId: "task-1", taskKind: null, project: null, title: "Durable", harness: null,
+    backend: null, worktree: null, durableState: "queued", currentRole: "queued", currentState: null,
+    currentSource: null, currentDetail: null, currentReason: null, holdKind: null, holdBucket: null,
+    holdReason: null, holdUntil: null, holdAgeDays: null, captainActionable: null,
+    blockedByIds: [], unresolvedBlockerIds: [], provenance: ["main-backlog"],
+    provenanceSelected: null, provenanceTrust: null, sourceFreshness: "fresh", freshness: "fresh",
+    observedAt: 1_000, ageSeconds: null,
+  } }
+
+  test("an idle healthy Firstmate inventory spends no header row", () => {
+    expect(groupMyWork([liveSession], false).map((g) => g.kind)).toEqual(["pinned", "sessions"])
+    expect(groupMyWork([], false).map((g) => g.kind)).toEqual(["pinned"])
+  })
+
+  test("a Firstmate health notice keeps an empty group to render in", () => {
+    const withNotice = groupMyWork([liveSession], true)
+    expect(withNotice.map((g) => g.kind)).toEqual(["pinned", "firstmate", "sessions"])
+    expect(withNotice.find((g) => g.kind === "firstmate")?.items).toEqual([])
+    expect(groupMyWork([], true).map((g) => g.kind)).toEqual(["pinned", "firstmate"])
+  })
+
+  test("Firstmate rows keep their own group whether or not a notice is showing", () => {
+    expect(groupMyWork([durableWork, liveSession], false).map((g) => g.kind)).toEqual(["pinned", "firstmate", "sessions"])
+    const noticed = groupMyWork([durableWork, liveSession], true)
+    expect(noticed.filter((g) => g.kind === "firstmate")).toHaveLength(1)
+    expect(noticed.find((g) => g.kind === "firstmate")?.items).toEqual([durableWork])
+  })
+
   test("pinned always leads the queue, even when empty", () => {
     expect(groupMyWork([]).map((g) => g.kind)).toEqual(["pinned"])
     expect(groupMyWork([])[0]?.items).toEqual([])

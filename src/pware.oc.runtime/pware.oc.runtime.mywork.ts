@@ -154,9 +154,15 @@ export function startWorkCommand(mode: StartWorkMode, planName?: string | null):
   return base
 }
 
-/** Group the My work queue. Pinned always leads — even when empty — as a placeholder. */
+/**
+ * Group the My work queue. Pinned always leads — even when empty — as a
+ * placeholder. Firstmate keeps an empty group only when a health notice needs
+ * somewhere to render; a configured but idle and healthy inventory spends no
+ * header row.
+ */
 export function groupMyWork(
   items: readonly MyWorkItem[],
+  hasFirstmateNotice = false,
 ): { kind: MyWorkKind; items: MyWorkItem[] }[] {
   const out: { kind: MyWorkKind; items: MyWorkItem[] }[] = []
   out.push({ kind: MY_WORK_GROUP_PINNED, items: items.filter((i) => i.kind === MY_WORK_GROUP_PINNED) })
@@ -164,6 +170,10 @@ export function groupMyWork(
     if (kind === MY_WORK_GROUP_PINNED) continue
     const bucket = items.filter((i) => i.kind === kind)
     if (bucket.length > 0) out.push({ kind, items: bucket })
+  }
+  if (hasFirstmateNotice && !out.some((g) => g.kind === MY_WORK_GROUP_FIRSTMATE)) {
+    const sessionsAt = out.findIndex((g) => g.kind === MY_WORK_GROUP_SESSIONS)
+    out.splice(sessionsAt < 0 ? out.length : sessionsAt, 0, { kind: MY_WORK_GROUP_FIRSTMATE, items: [] })
   }
   return out
 }

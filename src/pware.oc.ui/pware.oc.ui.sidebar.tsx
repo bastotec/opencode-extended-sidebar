@@ -913,20 +913,9 @@ export function SidebarPanel(props: SidebarProps): JSX.Element {
     ...myWorkApprovals(),
   ])
 
-  const myWorkGroups = createMemo(() => {
-    const groups = groupMyWork(myWorkItems())
-    // A configured inventory gets one durable home even before it has rows (or
-    // when its only visible result is a compact health notice). No snapshot,
-    // no new group — preserving the existing sidebar byte-for-byte.
-    if (snap().firstmate && !groups.some((group) => group.kind === MY_WORK_GROUP_FIRSTMATE)) {
-      const sessionsAt = groups.findIndex((group) => group.kind === MY_WORK_GROUP_SESSIONS)
-      groups.splice(sessionsAt < 0 ? groups.length : sessionsAt, 0, {
-        kind: MY_WORK_GROUP_FIRSTMATE,
-        items: [],
-      })
-    }
-    return groups
-  })
+  const myWorkGroups = createMemo(() =>
+    groupMyWork(myWorkItems(), Boolean(firstmateNotice(snap().firstmate))),
+  )
 
   /** My-work tab light — one scan pipeline for every tab (see `maybeScanBadge`). */
   const [myWorkAttn, setMyWorkAttn] = createSignal<readonly TabAttentionItem[]>([])
