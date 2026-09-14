@@ -181,21 +181,16 @@ function validOptionalString(row: JsonObject, key: string): boolean {
   return row[key] === undefined || row[key] === null || typeof row[key] === "string"
 }
 
-function sanitizeSecondmateRecords(value: unknown, diagnostic: string[]): { records: JsonObject[]; partial: boolean } {
+function sanitizeSecondmateRecords(value: unknown): { records: JsonObject[]; partial: boolean } {
   const raw = Array.isArray(value) ? value : []
   const records: JsonObject[] = []
   let partial = false
-  const mark = (id: string, detail: string): void => {
-    partial = true
-    diagnostic.push(`secondmate ${id}: ${detail}`)
-  }
-  for (let index = 0; index < raw.length; index++) {
-    const summary = object(raw[index])
-    const id = text(summary?.id) ?? `record ${index + 1}`
+  for (const entry of raw) {
+    const summary = object(entry)
     if (!summary || !text(summary.id) || typeof summary.remote !== "boolean" || typeof summary.registered !== "boolean"
       || !validOptionalString(summary, "host") || !validOptionalString(summary, "home")
       || !object(summary.current) || !object(summary.provenance) || !object(summary.freshness) || !object(summary.counts)) {
-      mark(id, "malformed current home summary")
+      partial = true
       continue
     }
 
@@ -211,17 +206,17 @@ function sanitizeSecondmateRecords(value: unknown, diagnostic: string[]): { reco
       || !text(freshness.status) || (freshness.observed_at !== null && freshness.observed_at !== undefined && time(freshness.observed_at) === null)
       || (freshness.age_seconds !== null && freshness.age_seconds !== undefined
         && (typeof freshness.age_seconds !== "number" || !Number.isFinite(freshness.age_seconds) || freshness.age_seconds < 0))) {
-      mark(id, "malformed current, provenance, or freshness fields")
+      partial = true
       summaryValid = false
     }
     if (text(provenance.selected) === "structured-home" && !text(summary.home)) {
-      mark(id, "structured home has no home path")
+      partial = true
       summaryValid = false
     }
     for (const surface of SECONDMATE_SURFACES) {
       const rows = summary[surface]
       if (!Array.isArray(rows)) {
-        mark(id, `${surface} must be an array`)
+        partial = true
         copy[surface] = []
         summaryValid = false
         continue
@@ -230,7 +225,7 @@ function sanitizeSecondmateRecords(value: unknown, diagnostic: string[]): { reco
       for (const entry of rows) {
         const row = object(entry)
         if (!row || !text(row.id)) {
-          mark(id, `malformed ${surface} row`)
+          partial = true
           summaryValid = false
           continue
         }
@@ -242,7 +237,7 @@ function sanitizeSecondmateRecords(value: unknown, diagnostic: string[]): { reco
           || (typeof row.hold_age_days === "number" && Number.isFinite(row.hold_age_days) && row.hold_age_days >= 0)
         const actionableValid = row.captain_actionable === undefined || row.captain_actionable === null || typeof row.captain_actionable === "boolean"
         if (!blockerFieldsValid || !stringsValid || !holdAgeValid || !actionableValid) {
-          mark(id, `malformed ${surface} fields for ${text(row.id)}`)
+          partial = true
           summaryValid = false
           continue
         }
@@ -254,7 +249,7 @@ function sanitizeSecondmateRecords(value: unknown, diagnostic: string[]): { reco
     const omitted = summary.omitted
     const omittedCounts = new Map<string, number>()
     if (!Array.isArray(omitted)) {
-      mark(id, "omitted must be an array")
+      partial = true
       copy.omitted = []
       summaryValid = false
     } else {
@@ -264,7 +259,7 @@ function sanitizeSecondmateRecords(value: unknown, diagnostic: string[]): { reco
         const surface = text(row?.surface)
         const count = row?.count
         if (!row || !surface || !SECONDMATE_SURFACES.includes(surface as typeof SECONDMATE_SURFACES[number]) || !nonNegativeInteger(count)) {
-          mark(id, "malformed omitted surface")
+          partial = true
           summaryValid = false
           continue
         }
@@ -280,7 +275,7 @@ function sanitizeSecondmateRecords(value: unknown, diagnostic: string[]): { reco
       const shown = (copy[surface] as JsonObject[]).length
       const expected = shown + (omittedCounts.get(surface) ?? 0)
       if (!nonNegativeInteger(count) || count !== expected) {
-        mark(id, `${surface} count ${String(count)} does not match ${expected} shown or omitted`)
+        partial = true
         summaryValid = false
       }
     }
@@ -330,7 +325,7 @@ function emptyItem(home: string, taskId: string): FirstmateWorkItem {
   }
 }
 
-function mainItems(home: string, generatedAt: number, backlog: JsonObject, tasks: JsonObject[]): FirstmateWorkItem[] {
+function mainItems(home: string, backlog: JsonObject, tasks: JsonObject[]): FirstmateWorkItem[] {
   const backlogRows = objects(backlog.records)
   const structured = backlogRows.filter((row) => row.structured === true && text(row.id))
   const backlogById = new Map(structured.map((row) => [text(row.id)!, row]))
@@ -345,7 +340,7 @@ function mainItems(home: string, generatedAt: number, backlog: JsonObject, tasks
     const current = object(task?.current_state)
     const paths = object(task?.paths)
     const worktree = object(paths?.worktree)
-    const observedAt = time(current?.observed_at) ?? generatedAt
+    const observedAt = time(current?.observed_at)
     const sourceFreshness = text(current?.freshness)
     const blockedByIds = strings(durable?.blocked_by_ids)
     const unresolvedBlockerIds = strings(durable?.unresolved_blocker_ids)
@@ -382,7 +377,7 @@ function mainItems(home: string, generatedAt: number, backlog: JsonObject, tasks
   return out
 }
 
-function secondmateItems(records: JsonObject[], diagnostic: string[]): FirstmateWorkItem[] {
+function secondmateItems(records: JsonObject[]): FirstmateWorkItem[] {
   const byKey = new Map<string, FirstmateWorkItem>()
   const get = (home: string, host: string | null, remote: boolean, id: string): FirstmateWorkItem => {
     const key = `${remote ? `remote:${host ?? "unknown"}` : "local"}\0${home}\0${id}`
@@ -400,7 +395,6 @@ function secondmateItems(records: JsonObject[], diagnostic: string[]): Firstmate
     const home = text(summary.home)
     const host = text(summary.host)
     const remote = summary.remote === true
-    const homeId = text(summary.id) ?? "unknown"
     const provenance = object(summary.provenance)
     const selected = text(provenance?.selected)
     const trust = text(provenance?.trust)
@@ -410,14 +404,7 @@ function secondmateItems(records: JsonObject[], diagnostic: string[]): Firstmate
     const observedAt = time(freshness?.observed_at)
     const ageSeconds = finite(freshness?.age_seconds)
     const reason = text(current?.reason)
-    if (!home || selected !== "structured-home") {
-      diagnostic.push(`secondmate ${homeId}: ${reason ?? "structured home unavailable"}`)
-      continue
-    }
-    if (trust !== "complete") diagnostic.push(`secondmate ${homeId}: ${reason ?? "partial structured home"}`)
-    for (const omitted of objects(summary.omitted)) {
-      diagnostic.push(`secondmate ${homeId}: ${text(omitted.surface) ?? "inventory"} omitted ${finite(omitted.count) ?? 0}`)
-    }
+    if (!home || selected !== "structured-home") continue
     const applyCommon = (item: FirstmateWorkItem, surface: string): void => {
       item.provenance = [...new Set([...item.provenance, `secondmate-${surface}`])]
       item.provenanceSelected = selected
@@ -511,39 +498,16 @@ function secondmateItems(records: JsonObject[], diagnostic: string[]): Firstmate
 
 export function normalizeFirstmate(value: unknown, configuredHome: string, configuredRoot: string): FirstmateSnapshot {
   const { backlog, tasks, main, current, landed, generatedAt } = validateEnvelope(value, configuredHome, configuredRoot)
-  const diagnostic: string[] = []
   let partial = false
   let overallFreshness: FirstmateFreshness = "fresh"
 
-  if (backlog.present !== true) {
-    partial = true
-    diagnostic.push("main backlog is absent")
-  }
-  if (main.valid !== true) {
-    partial = true
-    diagnostic.push(`main inventory: ${text(main.reason) ?? "invalid"}`)
-  }
-  const unstructuredCount = requiredNumber(main, "unstructured_current_count")
-  if (unstructuredCount > 0) {
-    partial = true
-    diagnostic.push(`main inventory has ${unstructuredCount} unstructured current row${unstructuredCount === 1 ? "" : "s"}`)
-  }
-  const orphanRows = requiredArray(main, "orphan_in_flight")
-  if (orphanRows.length > 0) {
-    partial = true
-    const orphanIds = orphanRows.map((entry) => text(object(entry)?.id) ?? text(entry)).filter((entry): entry is string => entry !== null)
-    diagnostic.push(`main inventory has ${orphanRows.length} orphan in-flight item${orphanRows.length === 1 ? "" : "s"}${orphanIds.length ? `: ${orphanIds.join(", ")}` : ""}`)
-  }
+  if (backlog.present !== true) partial = true
+  if (main.valid !== true) partial = true
+  if (requiredNumber(main, "unstructured_current_count") > 0) partial = true
+  if (requiredArray(main, "orphan_in_flight").length > 0) partial = true
 
   for (const task of tasks) {
-    const taskId = text(task.id) ?? "unknown"
-    const status = fresh(text(object(task.current_state)?.freshness))
-    if (status === "unknown") {
-      diagnostic.push(`main task ${taskId} freshness is unknown`)
-    } else if (status === "stale") {
-      diagnostic.push(`main task ${taskId} is stale`)
-    }
-    overallFreshness = aggregateFreshness(overallFreshness, status)
+    overallFreshness = aggregateFreshness(overallFreshness, fresh(text(object(task.current_state)?.freshness)))
   }
 
   const registry = requiredObject(current, "registry")
@@ -554,20 +518,10 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
     || !registryFreshness || !text(registryFreshness.status)
     || (registryFreshness.observed_at !== null && registryFreshness.observed_at !== undefined && time(registryFreshness.observed_at) === null)) {
     partial = true
-    diagnostic.push("secondmate registry contains malformed fields")
   }
-  if (registry.available !== true || registry.complete !== true) {
-    partial = true
-    diagnostic.push(...(registryReasons.length ? registryReasons.map((reason) => `secondmate registry: ${reason}`) : ["secondmate registry is incomplete"]))
-  }
-  if (registry.input_truncated === true || registry.records_truncated === true) {
-    partial = true
-    diagnostic.push("secondmate registry is truncated")
-  }
-  if (objects(registry.records).length !== requiredArray(registry, "records").length) {
-    partial = true
-    diagnostic.push("secondmate registry contains malformed records")
-  }
+  if (registry.available !== true || registry.complete !== true) partial = true
+  if (registry.input_truncated === true || registry.records_truncated === true) partial = true
+  if (objects(registry.records).length !== requiredArray(registry, "records").length) partial = true
   const totalRegistered = requiredNumber(current, "total_registered")
   const total = requiredNumber(current, "total")
   const shown = requiredNumber(current, "shown")
@@ -576,17 +530,13 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
   if (![totalRegistered, total, shown, truncated].every(nonNegativeInteger)
     || totalRegistered !== total || shown !== rawCurrentRecords.length || total !== shown + truncated) {
     partial = true
-    diagnostic.push("secondmate current totals are inconsistent")
   }
-  if (truncated > 0) {
-    partial = true
-    diagnostic.push(`secondmate current omitted ${truncated} registered homes`)
-  }
+  if (truncated > 0) partial = true
 
-  const sanitized = sanitizeSecondmateRecords(rawCurrentRecords, diagnostic)
+  const sanitized = sanitizeSecondmateRecords(rawCurrentRecords)
   if (sanitized.partial) partial = true
   const currentRecords = sanitized.records
-  const remote = secondmateItems(currentRecords, diagnostic)
+  const remote = secondmateItems(currentRecords)
   for (const summary of currentRecords) {
     const provenance = object(summary.provenance)
     const status = text(object(summary.freshness)?.status)
@@ -596,11 +546,7 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
     overallFreshness = aggregateFreshness(overallFreshness, normalized)
   }
   for (const key of ["truncated", "unreadable", "partial"]) {
-    const homes = strings(landed[key])
-    if (homes.length) {
-      partial = true
-      diagnostic.push(`secondmate landed ${key}: ${homes.join(", ")}`)
-    }
+    if (strings(landed[key]).length) partial = true
   }
 
   return {
@@ -608,9 +554,8 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
     completeness: partial ? "partial" : "complete",
     freshness: overallFreshness,
     observedAt: generatedAt,
-    diagnostic: [...new Set(diagnostic)].slice(0, 256),
     home: configuredHome,
     root: configuredRoot,
-    workItems: [...mainItems(configuredHome, generatedAt, backlog, tasks), ...remote],
+    workItems: [...mainItems(configuredHome, backlog, tasks), ...remote],
   }
 }

@@ -89,27 +89,6 @@ describe("startFirstmatePoller", () => {
     }
   })
 
-  test("bounds diagnostics retained across repeated failures", async () => {
-    const snapshots: FirstmateSnapshot[] = []
-    let call = 0
-    const handle = startFirstmatePoller({
-      configuration: config,
-      pollMs: 0,
-      onSnapshot: (snapshot) => snapshots.push(snapshot),
-      run: async () => {
-        call++
-        if (call === 1) return { ok: true, stdout: good, stderr: "", exitCode: 0, reason: "ok" as const }
-        return { ok: false, stdout: "", stderr: `failure ${call}`, exitCode: 2, reason: "nonzero" as const }
-      },
-    })
-    await waitFor(() => snapshots.length >= 270)
-    handle?.stop()
-    const bounded = snapshots[269]
-    expect(bounded?.diagnostic).toHaveLength(256)
-    expect(bounded?.diagnostic.at(-1)).toContain("failure 270")
-    expect(bounded?.diagnostic[0]).toContain("failure 15")
-  })
-
   test("allows only one command in flight and ignores a late result after stop", async () => {
     let calls = 0
     let resolve!: (value: { ok: true; stdout: string; stderr: string; exitCode: 0; reason: "ok" }) => void

@@ -25,10 +25,8 @@ export type FirstmateNotice = {
   glyph: GlyphSpec
 }
 
-export type FirstmateBudget = { show: boolean; showNotice: boolean; workRows: number }
-
 /** A compact plan for a Firstmate section under the sidebar's row budget. */
-export type FirstmateSection = FirstmateBudget & { showList: boolean }
+export type FirstmateSection = { show: boolean; showNotice: boolean; workRows: number; showList: boolean }
 
 function normalized(value: string | null | undefined): string {
   return value?.trim().toLowerCase().replace(/[ _]+/g, "-") ?? ""
@@ -130,15 +128,9 @@ export function firstmateNotice(snapshot: FirstmateSnapshot | undefined): Firstm
   return null
 }
 
-/** Allocate the health line and work rows as one section, never as overflow. */
-export function firstmateBudget(allocation: number, hasNotice: boolean): FirstmateBudget {
-  const rows = Math.max(0, Math.round(allocation))
-  if (rows === 0) return { show: false, showNotice: false, workRows: 0 }
-  return { show: true, showNotice: hasNotice, workRows: Math.max(0, rows - (hasNotice ? 1 : 0)) }
-}
-
 /**
- * Keep durable work reachable when the vertical budget cannot show a work row.
+ * Allocate the health line and work rows as one section, never as overflow, and
+ * keep durable work reachable when the vertical budget cannot show a work row.
  * The header uses `showList` for the same compact `view all` affordance as the
  * existing file sections; it never spends an extra sidebar row.
  */
@@ -147,10 +139,13 @@ export function firstmateSection(
   hasNotice: boolean,
   workCount: number,
 ): FirstmateSection {
-  const budget = firstmateBudget(allocation, hasNotice)
+  const rows = Math.max(0, Math.round(allocation))
+  const workRows = rows === 0 ? 0 : Math.max(0, rows - (hasNotice ? 1 : 0))
   return {
-    ...budget,
-    showList: Math.max(0, Math.round(workCount)) > 0 && budget.workRows === 0,
+    show: rows > 0,
+    showNotice: rows > 0 && hasNotice,
+    workRows,
+    showList: Math.max(0, Math.round(workCount)) > 0 && workRows === 0,
   }
 }
 

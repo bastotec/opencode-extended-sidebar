@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { FirstmateSnapshot, FirstmateWorkItem } from "../../../src/pware.oc.firstmate/pware.oc.firstmate.model.js"
 import { composeRow } from "../../../src/pware.oc.ui/pware.oc.ui.sections.js"
-import { firstmateBudget, firstmateContext, firstmateDetailLines, firstmateNotice, firstmateRow, firstmateSection, firstmateState } from "../../../src/pware.oc.ui/pware.oc.ui.firstmate.js"
+import { firstmateContext, firstmateDetailLines, firstmateNotice, firstmateRow, firstmateSection, firstmateState } from "../../../src/pware.oc.ui/pware.oc.ui.firstmate.js"
 
 const NOW = Date.UTC(2026, 8, 14, 12, 0, 0)
 
@@ -42,7 +42,6 @@ const snapshot = (patch: Partial<FirstmateSnapshot> = {}): FirstmateSnapshot => 
   completeness: "complete",
   freshness: "fresh",
   observedAt: NOW,
-  diagnostic: [],
   home: "/fleet",
   root: "/fleet",
   workItems: [],
@@ -173,10 +172,10 @@ describe("Firstmate sidebar rows", () => {
   })
 
   test("keeps durable work reachable through the header when no work row fits", () => {
-    expect(firstmateBudget(0, true)).toEqual({ show: false, showNotice: false, workRows: 0 })
-    expect(firstmateBudget(1, true)).toEqual({ show: true, showNotice: true, workRows: 0 })
-    expect(firstmateBudget(2, true)).toEqual({ show: true, showNotice: true, workRows: 1 })
-    expect(firstmateBudget(1, false)).toEqual({ show: true, showNotice: false, workRows: 1 })
+    expect(firstmateSection(0, true, 0)).toMatchObject({ show: false, showNotice: false, workRows: 0 })
+    expect(firstmateSection(1, true, 0)).toMatchObject({ show: true, showNotice: true, workRows: 0 })
+    expect(firstmateSection(2, true, 0)).toMatchObject({ show: true, showNotice: true, workRows: 1 })
+    expect(firstmateSection(1, false, 0)).toMatchObject({ show: true, showNotice: false, workRows: 1 })
     // This is the sidebar's real access decision: the `view all` header action
     // appears when rows cannot render work, not merely when allocation is zero.
     expect(firstmateSection(0, false, 1)).toMatchObject({ show: false, workRows: 0, showList: true })

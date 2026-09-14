@@ -11,20 +11,15 @@ export type FirstmatePollerHandle = {
 
 type Configured = Extract<FirstmateConfiguration, { configured: true }>
 
-function failureSnapshot(config: Configured, result: FirstmateCommandResult, lastGood: FirstmateSnapshot | null): FirstmateSnapshot {
-  const stderr = result.stderr.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 1_024)
-  const detail = stderr ? `: ${stderr}` : ""
-  const diagnostic = `Firstmate snapshot ${result.reason}${detail}`
+function failureSnapshot(config: Configured, lastGood: FirstmateSnapshot | null): FirstmateSnapshot {
   if (lastGood?.home === config.home) {
-    const diagnostics = [...lastGood.diagnostic, diagnostic]
     return {
       ...lastGood,
       freshness: "stale",
-      diagnostic: diagnostics.slice(Math.max(0, diagnostics.length - 256)),
       workItems: lastGood.workItems.map((item) => ({ ...item, freshness: "stale" })),
     }
   }
-  return unavailableFirstmate(config.home, config.root, diagnostic)
+  return unavailableFirstmate(config.home, config.root)
 }
 
 export type FirstmatePollerOptions = {
@@ -39,7 +34,7 @@ export function startFirstmatePoller(options: FirstmatePollerOptions): Firstmate
   const config = options.configuration ?? discoverFirstmate(options.env)
   if (!config.configured) return null
   if (config.diagnostic) {
-    options.onSnapshot(unavailableFirstmate(config.home, config.root, config.diagnostic))
+    options.onSnapshot(unavailableFirstmate(config.home, config.root))
     return { stop: () => {} }
   }
 
@@ -63,31 +58,20 @@ export function startFirstmatePoller(options: FirstmatePollerOptions): Firstmate
       if (stopped) return
       let snapshot: FirstmateSnapshot
       if (!result.ok) {
-        snapshot = failureSnapshot(config, result, lastGood)
+        snapshot = failureSnapshot(config, lastGood)
       } else {
         try {
           snapshot = normalizeFirstmate(JSON.parse(result.stdout), config.home, config.root)
           lastGood = snapshot
-        } catch (error) {
-          snapshot = failureSnapshot(config, {
-            ...result,
-            ok: false,
-            reason: "malformed",
-            stderr: error instanceof Error ? error.message : "Malformed Firstmate snapshot",
-          }, lastGood)
+        } catch {
+          snapshot = failureSnapshot(config, lastGood)
         }
       }
       if (snapshot.availability === "available") lastGood = snapshot
       options.onSnapshot(snapshot)
-    }).catch((error) => {
+    }).catch(() => {
       if (!stopped) {
-        const snapshot = failureSnapshot(config, {
-        ok: false,
-        stdout: "",
-        stderr: error instanceof Error ? error.message : "Firstmate read failed",
-        exitCode: null,
-        reason: "spawn",
-        }, lastGood)
+        const snapshot = failureSnapshot(config, lastGood)
         if (snapshot.availability === "available") lastGood = snapshot
         options.onSnapshot(snapshot)
       }

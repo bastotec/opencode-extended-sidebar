@@ -26,8 +26,6 @@ export type RuntimeSourceOptions = {
   projectRoot: string | null
   dbPath?: string
   pollMs?: number
-  firstmatePollMs?: number
-  env?: NodeJS.ProcessEnv
   monitorFactory?: (options: Parameters<typeof startMonitor>[0]) => MonitorHandle
   firstmatePollerFactory?: (options: FirstmatePollerOptions) => FirstmatePollerHandle | null
 }
@@ -74,8 +72,6 @@ export function startRuntimeSource(opts: RuntimeSourceOptions): RuntimeSourceHan
 
   let monitor = bindMonitor(watchedSessionId)
   const firstmate: FirstmatePollerHandle | null = (opts.firstmatePollerFactory ?? startFirstmatePoller)({
-    env: opts.env,
-    pollMs: opts.firstmatePollMs,
     onSnapshot: (snapshot) => {
       firstmateSnapshot = snapshot
       publish()

@@ -62,13 +62,17 @@ describe("normalizeFirstmate", () => {
     expect(duplicated.every((item) => item.remote === true)).toBe(true)
   })
 
-  test("reports unknown freshness for a durable record the producer never observed", () => {
+  test("reports no observation for a durable record the producer never observed", () => {
     const snapshot = normalizeFirstmate(fixture, "/tmp/fm-home", "/tmp/fm-root")
     expect(snapshot.workItems.find((item) => item.taskId === "b1")).toMatchObject({
       sourceFreshness: null,
       freshness: "unknown",
+      observedAt: null,
     })
-    expect(snapshot.workItems.find((item) => item.taskId === "i1")?.freshness).toBe("fresh")
+    expect(snapshot.workItems.find((item) => item.taskId === "i1")).toMatchObject({
+      freshness: "fresh",
+      observedAt: Date.parse("2026-09-13T11:59:58Z"),
+    })
   })
 
   test("does not authorize navigation from unknown v1 extension fields", () => {
@@ -98,14 +102,10 @@ describe("normalizeFirstmate", () => {
     })
   })
 
-  test("derives degraded diagnostics, cached freshness, counts, and ledger age", () => {
+  test("derives degraded completeness, cached freshness, and ledger age", () => {
     const snapshot = normalizeFirstmate(degraded, "/tmp/fm-home", "/tmp/fm-root")
     expect(snapshot.completeness).toBe("partial")
     expect(snapshot.freshness).toBe("stale")
-    expect(snapshot.diagnostic.join(" ")).toContain("main inventory")
-    expect(snapshot.diagnostic.join(" ")).toContain("registry")
-    expect(snapshot.diagnostic.join(" ")).toContain("omitted")
-    expect(snapshot.diagnostic.join(" ")).toContain("unreadable")
     const item = snapshot.workItems.find((entry) => entry.taskId === "partial-queued")
     expect(item).toMatchObject({
       freshness: "stale", sourceFreshness: "cached", ageSeconds: 3660,
@@ -118,7 +118,6 @@ describe("normalizeFirstmate", () => {
     const snapshot = normalizeFirstmate(omissionOnly, "/tmp/fm-home", "/tmp/fm-root")
     expect(snapshot.freshness).toBe("fresh")
     expect(snapshot.completeness).toBe("partial")
-    expect(snapshot.diagnostic).toContain("secondmate mate-omitted: active_children omitted 2")
   })
 
   test("degrades malformed nested Secondmate rows and fields without projecting them", () => {
@@ -135,7 +134,6 @@ describe("normalizeFirstmate", () => {
     expect(snapshot.completeness).toBe("partial")
     expect(snapshot.workItems.find((item) => item.taskId === "remote-blocked")?.durableState).toBeNull()
     expect(snapshot.workItems.find((item) => item.taskId === "remote-decision")?.provenanceTrust).toBe("partial-structured")
-    expect(snapshot.diagnostic.join(" ")).toContain("malformed")
   })
 
   test("degrades inconsistent Secondmate totals, counts, and omission surfaces", () => {
@@ -147,20 +145,19 @@ describe("normalizeFirstmate", () => {
 
     const snapshot = normalizeFirstmate(inconsistent, "/tmp/fm-home", "/tmp/fm-root")
     expect(snapshot.completeness).toBe("partial")
-    expect(snapshot.diagnostic).toContain("secondmate current totals are inconsistent")
-    expect(snapshot.diagnostic.join(" ")).toContain("malformed omitted surface")
-    expect(snapshot.diagnostic.join(" ")).toContain("holds count 9 does not match 1")
+    expect(snapshot.workItems.find((item) => item.taskId === "remote-active")?.provenanceTrust).toBe("partial-structured")
   })
 
   test("reports unstructured current rows and orphan work even when main claims validity", () => {
-    const inconsistent = structuredClone(fixture)
-    inconsistent.main_inventory.unstructured_current_count = 2
-    inconsistent.main_inventory.orphan_in_flight = [{ id: "orphan-1" }]
+    expect(normalizeFirstmate(fixture, "/tmp/fm-home", "/tmp/fm-root").completeness).toBe("complete")
 
-    const snapshot = normalizeFirstmate(inconsistent, "/tmp/fm-home", "/tmp/fm-root")
-    expect(snapshot.completeness).toBe("partial")
-    expect(snapshot.diagnostic.join(" ")).toContain("2 unstructured current rows")
-    expect(snapshot.diagnostic.join(" ")).toContain("orphan-1")
+    const unstructured = structuredClone(fixture)
+    unstructured.main_inventory.unstructured_current_count = 2
+    expect(normalizeFirstmate(unstructured, "/tmp/fm-home", "/tmp/fm-root").completeness).toBe("partial")
+
+    const orphaned = structuredClone(fixture)
+    orphaned.main_inventory.orphan_in_flight = [{ id: "orphan-1" }]
+    expect(normalizeFirstmate(orphaned, "/tmp/fm-home", "/tmp/fm-root").completeness).toBe("partial")
   })
 
   test("preserves stale aggregate freshness when main tasks also include unknown freshness", () => {
@@ -169,9 +166,7 @@ describe("normalizeFirstmate", () => {
     expect(normalizeFirstmate(stale, "/tmp/fm-home", "/tmp/fm-root").freshness).toBe("stale")
 
     stale.tasks[1].current_state.freshness = "unexpected"
-    const snapshot = normalizeFirstmate(stale, "/tmp/fm-home", "/tmp/fm-root")
-    expect(snapshot.freshness).toBe("stale")
-    expect(snapshot.diagnostic.join(" ")).toContain("main task i1 freshness is unknown")
+    expect(normalizeFirstmate(stale, "/tmp/fm-home", "/tmp/fm-root").freshness).toBe("stale")
   })
 
   test("preserves stale aggregate freshness across stale and unknown Secondmate homes", () => {

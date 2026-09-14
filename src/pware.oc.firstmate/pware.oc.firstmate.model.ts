@@ -58,19 +58,17 @@ export type FirstmateSnapshot = {
   completeness: FirstmateCompleteness
   freshness: FirstmateFreshness
   observedAt: number | null
-  diagnostic: string[]
   home: string
   root: string
   workItems: FirstmateWorkItem[]
 }
 
-export function unavailableFirstmate(home: string, root: string, diagnostic: string): FirstmateSnapshot {
+export function unavailableFirstmate(home: string, root: string): FirstmateSnapshot {
   return {
     availability: "unavailable",
     completeness: "unknown",
     freshness: "unknown",
     observedAt: null,
-    diagnostic: [diagnostic],
     home,
     root,
     workItems: [],

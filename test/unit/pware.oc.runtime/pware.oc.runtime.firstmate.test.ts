@@ -24,7 +24,7 @@ function host(sessionId: string, error: string | null = null): RuntimeSnapshot {
 describe("Firstmate runtime source composition", () => {
   test("publishes additive fleet updates without replacing host data", () => {
     const runtime = host("one", "db read failed")
-    const firstmate = unavailableFirstmate("/tmp/home", "/tmp/root", "malformed")
+    const firstmate = unavailableFirstmate("/tmp/home", "/tmp/root")
     const merged = withFirstmateSnapshot(runtime, firstmate)
     expect(merged.db).toBe(runtime.db)
     expect(merged.omo).toBe(runtime.omo)
@@ -56,7 +56,7 @@ describe("Firstmate runtime source composition", () => {
       },
       firstmatePollerFactory: (options) => {
         fleetStarts++
-        options.onSnapshot(unavailableFirstmate("/tmp/home", "/tmp/root", "fleet unavailable"))
+        options.onSnapshot(unavailableFirstmate("/tmp/home", "/tmp/root"))
         return { stop: () => { fleetStops++ } }
       },
     })
