@@ -1,0 +1,56 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-09-13T12:00:00Z",
+  "fm_home": "/tmp/fm-home",
+  "roots": {
+    "fm_root": "/tmp/fm-root",
+    "state": "/tmp/fm-home/state",
+    "data": "/tmp/fm-home/data",
+    "config": "/tmp/fm-home/config",
+    "projects": "/tmp/fm-home/projects"
+  },
+  "backlog": {
+    "path": "/tmp/fm-home/data/backlog.md",
+    "present": true,
+    "records": [
+      { "structured": true, "id": "q1", "state": "queued", "title": "Queued", "repo": "alpha", "kind": "ship", "current_role": "queued", "hold_kind": null, "hold_bucket": null, "hold_reason": null, "hold_until": null, "hold_age_days": null, "captain_actionable": false, "blocked_by_ids": [], "unresolved_blocker_ids": [] },
+      { "structured": true, "id": "i1", "state": "in_flight", "title": "Inflight", "repo": "alpha", "kind": "ship", "current_role": "worker", "hold_kind": null, "hold_bucket": null, "hold_reason": null, "hold_until": null, "hold_age_days": null, "captain_actionable": false, "blocked_by_ids": [], "unresolved_blocker_ids": [] },
+      { "structured": true, "id": "h1", "state": "in_flight", "title": "Held", "repo": "beta", "kind": "ship", "current_role": "held", "hold_kind": "captain", "hold_bucket": "live", "hold_reason": "choose route", "hold_until": null, "hold_age_days": 2, "captain_actionable": true, "blocked_by_ids": [], "unresolved_blocker_ids": [] },
+      { "structured": true, "id": "b1", "state": "queued", "title": "Blocked", "repo": "beta", "kind": "ship", "current_role": "queued", "hold_kind": "captain", "hold_bucket": "blocked", "hold_reason": "waiting for dependency", "hold_until": null, "hold_age_days": 1, "captain_actionable": false, "blocked_by_ids": ["dep1"], "unresolved_blocker_ids": ["dep1"] },
+      { "structured": true, "id": "p1", "state": "in_flight", "title": "Program", "repo": "gamma", "kind": "program", "current_role": "program", "hold_kind": null, "hold_bucket": null, "hold_reason": null, "hold_until": null, "hold_age_days": null, "captain_actionable": false, "blocked_by_ids": [], "unresolved_blocker_ids": [] },
+      { "structured": true, "id": "done1", "state": "done", "title": "Done", "repo": "alpha", "kind": "ship", "current_role": "done", "blocked_by_ids": [], "unresolved_blocker_ids": [] }
+    ]
+  },
+  "tasks": [
+    { "id": "q1", "kind": "ship", "harness": "opencode", "project": "alpha", "backend": "tmux", "current_state": { "state": "queued", "source": "pane", "detail": "waiting", "raw": "", "observed_at": "2026-09-13T12:00:00Z", "freshness": "fresh" }, "paths": { "worktree": { "path": "/tmp/fm-home/projects/q1", "present": true } } },
+    { "id": "i1", "kind": "ship", "harness": "codex", "project": "alpha", "backend": "tmux", "current_state": { "state": "working", "source": "pane", "detail": "running tests", "raw": "", "observed_at": "2026-09-13T11:59:58Z", "freshness": "fresh" }, "paths": { "worktree": { "path": "/tmp/fm-home/projects/i1", "present": true } } },
+    { "id": "h1", "kind": "ship", "harness": "other", "project": "beta", "backend": "process", "current_state": { "state": "parked", "source": "status-log", "detail": "captain decision", "raw": "", "observed_at": "2026-09-13T11:59:00Z", "freshness": "fresh" }, "paths": { "worktree": { "path": "/tmp/fm-home/projects/h1", "present": true } } },
+    { "id": "meta1", "kind": "scout", "harness": "codex", "project": "gamma", "backend": "tmux", "current_state": { "state": "unknown", "source": "none", "detail": "metadata only", "raw": "", "observed_at": "2026-09-13T12:00:00Z", "freshness": "fresh" }, "paths": { "worktree": { "path": "/tmp/fm-home/projects/meta1", "present": true } } }
+  ],
+  "main_inventory": { "valid": true, "reason": null, "orphan_in_flight": [], "unstructured_current_count": 0 },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": { "present": true, "available": true, "complete": true, "reason": null, "provenance": "registered-table", "path": "/tmp/fm-home/config/secondmates", "freshness": { "status": "fresh", "observed_at": "2026-09-13T12:00:00Z" }, "records": [], "input_truncated": false, "records_truncated": false, "reasons": [], "lines_in_window": 1, "records_in_window": 1 },
+    "records": [
+      {
+        "id": "mate-a", "home": "/srv/mate-a", "host": "host-a", "remote": true, "registered": true, "current": { "state": "captain_decision", "reason": null },
+        "provenance": { "selected": "structured-home", "structured_home": "/srv/mate-a", "summary_source": "remote-ledger", "summary_valid": true, "trust": "complete", "parent_event_role": "historical-only" },
+        "freshness": { "status": "fresh", "observed_at": "2026-09-13T11:59:50Z", "age_seconds": 10 },
+        "active_children": [{ "id": "remote-active", "kind": "ship", "state": "working", "repo": "delta", "name": "Remote active", "source": "pane", "doing": "building" }],
+        "queued": [{ "id": "remote-blocked", "title": "Remote blocked", "repo": "delta", "kind": "ship", "blocked_by_ids": ["remote-dep"], "unresolved_blocker_ids": ["remote-dep"], "blocked_reason": "dependency", "hold_reason": "dependency", "hold_kind": "captain", "hold_until": null, "hold_bucket": "blocked", "hold_age_days": 3, "captain_actionable": false }],
+        "holds": [{ "id": "remote-blocked", "title": "Remote blocked", "blocked_by_ids": ["remote-dep"], "unresolved_blocker_ids": ["remote-dep"], "reason": "dependency", "source": "backlog" }],
+        "decisions_open": [
+          { "id": "remote-decision", "key": "route", "verb": "needs-decision", "summary": "Choose route", "reason": null, "source": "status" },
+          { "id": "remote-decision", "key": "budget", "verb": "needs-decision", "summary": "Choose budget", "reason": null, "source": "status" },
+          { "id": "captain-only", "key": "captain-only", "verb": "captain-hold", "summary": "Captain approval", "reason": "approve deployment", "hold_until": null, "hold_bucket": "live", "hold_age_days": 1, "source": "backlog" }
+        ],
+        "landed": [], "endpoints": [],
+        "counts": { "active_children": 1, "decisions_open": 3, "holds": 1, "queued": 1, "landed": 0, "endpoints": 0 },
+        "omitted": []
+      }
+    ],
+    "total_registered": 1, "total": 1, "shown": 1, "truncated": 0
+  },
+  "secondmate_landed": { "records": [], "truncated": [], "unreadable": [], "partial": [] },
+  "secondmate_guidance": { "note": "canonical guidance" }
+}

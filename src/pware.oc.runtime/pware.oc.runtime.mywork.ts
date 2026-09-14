@@ -12,6 +12,7 @@ import type {
 } from "../pware.oc.opencode/resolver/pware.oc.opencode.resolver.session.js"
 import type { ReviewState } from "../pware.oc.omo/resolver/pware.oc.omo.resolver.plan.js"
 import type { EnrichedApproval } from "./pware.oc.runtime.mywork-enrich.js"
+import type { FirstmateWorkItem } from "../pware.oc.firstmate/pware.oc.firstmate.model.js"
 import {
   MY_WORK_GROUP_DISMISSED,
   MY_WORK_GROUP_DRAFT_DOCS,
@@ -22,6 +23,7 @@ import {
   MY_WORK_GROUP_READY_REVIEW,
   MY_WORK_GROUP_READY_START,
   MY_WORK_GROUP_SESSIONS,
+  MY_WORK_GROUP_FIRSTMATE,
   type ApprovalGroupKind,
 } from "../pware.oc.core/constants/pware.oc.core.constants.myWork.js"
 import { isDraftOf, resolveApprovalGroup } from "../pware.oc.omo/resolver/pware.oc.omo.resolver.approvalGroup.js"
@@ -62,6 +64,10 @@ export type MyWorkItem =
       review: ReviewState | null
     }
   | {
+      kind: typeof MY_WORK_GROUP_FIRSTMATE
+      work: FirstmateWorkItem
+    }
+  | {
       kind: typeof MY_WORK_GROUP_SESSIONS
       sessionId: string
       title: string
@@ -95,6 +101,7 @@ export const MY_WORK_ORDER: readonly MyWorkKind[] = [
   QUESTION_KIND_QUESTION,
   QUESTION_KIND_INTERRUPTED,
   QUESTION_KIND_ERROR,
+  MY_WORK_GROUP_FIRSTMATE,
   MY_WORK_GROUP_SESSIONS,
   MY_WORK_GROUP_READY_REVIEW,
   MY_WORK_GROUP_READY_START,
@@ -110,6 +117,7 @@ const MY_WORK_LABELS: Record<MyWorkKind, string> = {
   [QUESTION_KIND_QUESTION]: "Awaiting answer",
   [QUESTION_KIND_INTERRUPTED]: "Interrupted",
   [QUESTION_KIND_ERROR]: "Errors",
+  [MY_WORK_GROUP_FIRSTMATE]: "Firstmate",
   [MY_WORK_GROUP_SESSIONS]: "Sessions",
   [MY_WORK_GROUP_READY_REVIEW]: "Ready to review",
   [MY_WORK_GROUP_READY_START]: "Ready to start",
@@ -146,9 +154,15 @@ export function startWorkCommand(mode: StartWorkMode, planName?: string | null):
   return base
 }
 
-/** Group the My work queue. Pinned always leads — even when empty — as a placeholder. */
+/**
+ * Group the My work queue. Pinned always leads — even when empty — as a
+ * placeholder. Firstmate keeps an empty group only when a health notice needs
+ * somewhere to render; a configured but idle and healthy inventory spends no
+ * header row.
+ */
 export function groupMyWork(
   items: readonly MyWorkItem[],
+  hasFirstmateNotice = false,
 ): { kind: MyWorkKind; items: MyWorkItem[] }[] {
   const out: { kind: MyWorkKind; items: MyWorkItem[] }[] = []
   out.push({ kind: MY_WORK_GROUP_PINNED, items: items.filter((i) => i.kind === MY_WORK_GROUP_PINNED) })
@@ -156,6 +170,10 @@ export function groupMyWork(
     if (kind === MY_WORK_GROUP_PINNED) continue
     const bucket = items.filter((i) => i.kind === kind)
     if (bucket.length > 0) out.push({ kind, items: bucket })
+  }
+  if (hasFirstmateNotice && !out.some((g) => g.kind === MY_WORK_GROUP_FIRSTMATE)) {
+    const sessionsAt = out.findIndex((g) => g.kind === MY_WORK_GROUP_SESSIONS)
+    out.splice(sessionsAt < 0 ? out.length : sessionsAt, 0, { kind: MY_WORK_GROUP_FIRSTMATE, items: [] })
   }
   return out
 }
@@ -221,6 +239,11 @@ export function toSessionItems(
     status: s.status,
     timeUpdated: s.timeUpdated,
   }))
+}
+
+/** Build one detail-only row per canonical durable Firstmate work item. */
+export function toFirstmateItems(items: readonly FirstmateWorkItem[]): MyWorkItem[] {
+  return items.map((work) => ({ kind: MY_WORK_GROUP_FIRSTMATE, work }))
 }
 
 /** Build pinned items from pinned session ids joined to their recent-session rows, in pin order; ids missing from `recent` are skipped. */

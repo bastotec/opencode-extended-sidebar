@@ -13,6 +13,11 @@ features stay hidden. Four runtime dependencies (`ignore`, `asciichart`,
 `simple-statistics`, `@crafter/charts`); everything else is an OpenCode /
 OpenTUI peer.
 
+Firstmate is another optional domain. It is enabled only by an explicit home
+environment variable and reads the canonical `fm-fleet-snapshot.v1` command
+output. Without that variable, it starts no process or timer and adds no data
+to the runtime snapshot.
+
 This file is the canonical index of the project structure: what lives where,
 which layer may import which, and how tests mirror the modules. Code follows
 this map — a file that does not fit one of the modules below is misplaced.
@@ -103,7 +108,16 @@ src/
 │       ├── pware.oc.omo.resolver.approvalState.ts
 │       ├── pware.oc.omo.resolver.doc.ts
 │       └── pware.oc.omo.resolver.config.ts
-├── pware.oc.runtime/                      # runtime composition: OpenCode + optional OMO features
+├── pware.oc.firstmate/                    # optional Firstmate snapshot command boundary
+│   ├── index.ts
+│   ├── pware.oc.firstmate.model.ts
+│   ├── pware.oc.firstmate.discovery.ts
+│   ├── pware.oc.firstmate.normalize.ts
+│   ├── pware.oc.firstmate.command.ts
+│   ├── pware.oc.firstmate.worker.ts
+│   ├── pware.oc.firstmate.normalizeClient.ts
+│   └── pware.oc.firstmate.poller.ts
+├── pware.oc.runtime/                      # runtime composition: OpenCode + optional domains
 │   ├── index.ts
 │   ├── pware.oc.runtime.monitor.ts
 │   ├── pware.oc.runtime.source.ts
@@ -145,7 +159,8 @@ src/
 |---|---|---|
 | `pware.oc.ui` | TUI components, dialogs, glyphs | anything below |
 | `pware.oc.perf` | timing reader + view | core + ui (view) |
-| `pware.oc.runtime` | snapshot composition, monitor, my-work queue | opencode, omo, core |
+| `pware.oc.runtime` | snapshot composition, peer pollers, my-work queue | opencode, omo, firstmate, core |
+| `pware.oc.firstmate` | optional fixed-command discovery, normalization, polling | Node/Bun built-ins only |
 | `pware.oc.opencode` | required OpenCode host data and events | core |
 | `pware.oc.omo` | optional OMO artifacts and OpenCode correlation | opencode, core |
 | `pware.oc.core` | shared infra, pure helpers, git | **nothing** |
@@ -164,8 +179,8 @@ Rules:
   generic `opencode` layer never imports OMO or interprets `.omo/` /
   `.sisyphus/` artifacts. This keeps OES fully usable when OMO is absent.
 - `runtime` composes the always-present OpenCode snapshot with optional
-  OMO-aware capabilities for the panel. Cross-source composition that is not
-  itself OMO-specific remains in `runtime`.
+  domain data for the panel. It may import `firstmate`; `firstmate` never imports
+  `runtime`, OpenCode, OMO, or UI code.
 - The panel renders; it does not re-decide. View rules (glyphs, labels, row
   budgets, folds) live in `core` or `ui` as exported helpers the JSX calls.
 - No `core` module imports a `pware.oc.ui.*` module. Formatter data lives in
@@ -277,20 +292,55 @@ slot (order 320) rendering `<SidebarPanel/>`. Referenced by
 | `startWork.ts` | OMO `start work` delivery modes | `START_WORK_*`, `START_WORK_MODES`, `StartWorkMode` |
 | `eventName.ts` | OMO-domain event names (`pware.omo.*`) | `EV_OMO_BOULDER_CHANGED`, `EV_OMO_DOCS_CHANGED`, `EV_OMO_CONFIG_CHANGED` |
 
+### `pware.oc.firstmate`: optional Firstmate domain
+
+| Module | Responsibility | Key exports |
+|---|---|---|
+| `model.ts` | plain snapshot and work-item DTOs | `FirstmateSnapshot`, `FirstmateWorkItem`, `FIRSTMATE_SNAPSHOT_SCHEMA` |
+| `discovery.ts` | explicit environment lookup, path checks, sanitized command environment | `discoverFirstmate()`, `firstmateCommandEnv()` |
+| `normalize.ts` | `fm-fleet-snapshot.v1` validation, canonical backlog/task union, and remote host/home/task identity | `normalizeFirstmate()` |
+| `command.ts` | fixed argv direct subprocess with deadline, output bounds, and bounded direct-child TERM/KILL cleanup | `runFirstmateCommand()` |
+| `worker.ts` | Bun Worker entry parsing and normalizing a payload off the TUI main thread | (worker entry) |
+| `normalizeClient.ts` | async normalize client: lazy singleton worker + host-process fallback | `normalizeFirstmateAsync()`, `shutdownFirstmateWorker()` |
+| `poller.ts` | completion-based polling and same-home last-good retention | `startFirstmatePoller()`, `FirstmatePollerHandle` |
+
+`fm-fleet-snapshot.v1` is the only Firstmate data boundary. This domain never
+parses backlog, status, task, or secondmate files. It disables the Firstmate
+snapshot cache and does not start watchers, take locks, mutate data, or run
+actions. Undeclared extension fields are ignored. In particular, v1 has no
+durable OpenCode session mapping, so Firstmate rows open read-only details and
+do not navigate to a session. The configured executable is treated as trusted
+same-user code.
+Its resolved ancestor chain must not contain replaceable group- or
+world-writable directories; safe root-owned and sticky ancestors are allowed.
+OES never discovers or signals descendants. It only asks its direct Bun
+subprocess to terminate while that handle is still active, and cancels bounded
+output readers if inherited pipes remain open after the subprocess exits.
+
 ### `pware.oc.runtime` — runtime composition
 
 | Module | Responsibility | Key exports |
 |---|---|---|
-| `pware.oc.runtime.monitor.ts` | watch boulder + poll SQLite stamps, fingerprint-driven; emits snapshot + boulder-change events (snapshot read is off-thread via `snapshotClient`) | `startMonitor()`, `MonitorHandle` |
-| `pware.oc.runtime.source.ts` | runtime source orchestration: monitor lifecycle + debounced refresh from `pware.oes.*`/`pware.omo.*` hints; shuts the worker down on stop | `startRuntimeSource()`, `RuntimeSourceHandle` |
+| `pware.oc.runtime.monitor.ts` | watch boulder + poll SQLite stamps, fingerprint-driven; reports snapshots through `onChange` and boulder writes through `onBoulderChange` (snapshot read is off-thread via `snapshotClient`) | `startMonitor()`, `MonitorHandle` |
+| `pware.oc.runtime.source.ts` | runtime source orchestration: host monitor lifecycle, debounced hints, and optional Firstmate peer poller; shuts both sources down on stop | `startRuntimeSource()`, `RuntimeSourceHandle`, `withFirstmateSnapshot()` |
 | `pware.oc.runtime.worker.ts` | Bun Worker entry running `readRuntimeSnapshot` off the TUI main thread | (worker entry) |
 | `pware.oc.runtime.snapshotClient.ts` | async snapshot client: lazy singleton worker + paced host-process gateway fallback | `readRuntimeSnapshotAsync()`, `shutdownSnapshotWorker()`, `SnapshotRequestOpts` |
-| `pware.oc.runtime.mywork.ts` | the "My work" queue (pinned + questions + sessions + approvals + draft docs + plans) | `MyWorkItem`, `groupMyWork()`, `toQuestionItems()`, `toSessionItems()`, `toPinnedItems()`, `toApprovalItems()`, `toDraftDocItems()`, `toPlanItems()`, `dropDismissed()`, `parseDismissed()`, `formatDismissed()`, `approvalContinueHint()`, `startWorkCommand()`, `StartWorkMode` |
+| `pware.oc.runtime.mywork.ts` | the "My work" queue (pinned + questions + Firstmate + sessions + approvals + docs) | `MyWorkItem`, `groupMyWork()`, `toFirstmateItems()`, `toQuestionItems()`, `toSessionItems()`, `toPinnedItems()`, `toApprovalItems()` |
 | `pware.oc.runtime.mywork-enrich.ts` | paced writer-session todo reconciliation for approval rows (opencode SQLite + omo run-continuation) | `enrichApprovalSessionStates()`, `EnrichedApproval` |
 | `pware.oc.runtime.omoRead.ts` | paced OMO-to-OpenCode lookups used by draft lists and plan dialogs | `readSessionDrafts()`, `readPlanSession()`, `PlanSessionRead` |
 | `pware.oc.runtime.questions.ts` | in-memory per-session open-question cache; SQLite access stays in the runtime gateway request | `createQuestionCache()`, `mergeQuestions()`, `QuestionCache` |
 | `resolver/index.ts` | atomic, staged unified runtime snapshot; unchanged cheap fingerprints return before any SQL | `RuntimeSnapshot`, `readRuntimeSnapshot()`, `computeFingerprint()`, `resetRuntimeCache()` |
 | `resolver/delegate.ts` | delegate enrichment + grouping | `enrichDelegates()`, `reconcileDelegateStatus()`, `groupDelegates()`, `delegatesForSession()` |
+
+The host worker resolves `RuntimeSnapshot` first. `runtime.source` then attaches
+the latest Firstmate result as an additive field and publishes the combined
+snapshot. The Firstmate poller runs on its own completion-based cycle, about
+every 30 seconds, rather than the OpenCode monitor interval.
+
+Firstmate failures do not stop host snapshots or session switches. A failed
+command keeps only the last good rows from the same configured home, marks them
+stale, and preserves their observation time. Successful empty or partial reads
+replace the prior result, so old rows are not restored.
 
 ### `pware.oc.perf` — timing analysis + plugin self-cost
 
@@ -330,6 +380,8 @@ slot (order 320) rendering `<SidebarPanel/>`. Referenced by
   the module map above (e.g. `test/unit/pware.oc.core/git/pware.oc.core.git.test.ts`).
 - `test/snapshot/sidebar.test.ts` — SQLite + `.omo` fixtures through
   `readRuntimeSnapshot` / `delegatesForSession`.
+- `test/unit/pware.oc.firstmate/` and `test/fixtures/firstmate/` cover the
+  optional command boundary, normalization, polling, and failure handling.
 - `test/bench/scan.test.ts` — 5k-part budgets (fingerprint, snapshot, tools/files, Perf).
 - `test/helpers/` — shared fixtures (`project.ts`, `sqlite.ts`) and
   `privacy.ts` (exports `assertPrivacy`).

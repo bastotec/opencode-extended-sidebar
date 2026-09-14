@@ -43,6 +43,9 @@ export const MY_WORK_GROUP_PLANS = "plans"
 /** My work group: the project's recent sessions — jump straight back into any of them. */
 export const MY_WORK_GROUP_SESSIONS = "sessions"
 
+/** Canonical durable work reported by an explicitly configured Firstmate home. */
+export const MY_WORK_GROUP_FIRSTMATE = "firstmate"
+
 /** Every "My work" approval group. */
 export const MY_WORK_GROUPS = [
   MY_WORK_GROUP_READY_REVIEW,

@@ -1,0 +1,34 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-09-13T12:01:00Z",
+  "fm_home": "/tmp/fm-home",
+  "roots": { "fm_root": "/tmp/fm-root", "state": "/tmp/fm-home/state", "data": "/tmp/fm-home/data", "config": "/tmp/fm-home/config", "projects": "/tmp/fm-home/projects" },
+  "backlog": { "path": "/tmp/fm-home/data/backlog.md", "present": true, "records": [] },
+  "tasks": [],
+  "main_inventory": { "valid": false, "reason": "unstructured current backlog row", "orphan_in_flight": [], "unstructured_current_count": 1 },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": { "present": true, "available": true, "complete": false, "reason": "registered table truncated", "provenance": "registered-table", "path": "/tmp/fm-home/config/secondmates", "freshness": { "status": "fresh", "observed_at": "2026-09-13T12:01:00Z" }, "records": [], "input_truncated": true, "records_truncated": true, "reasons": ["registered table truncated"], "lines_in_window": 256, "records_in_window": 40 },
+    "records": [
+      {
+        "id": "mate-partial", "home": "/srv/mate-partial", "host": "host-partial", "remote": true, "registered": true, "current": { "state": "unknown", "reason": "structured home state invalid: child unavailable" },
+        "provenance": { "selected": "structured-home", "structured_home": "/srv/mate-partial", "summary_source": "remote-ledger-cache", "summary_valid": false, "trust": "partial-structured", "parent_event_role": "historical-only" },
+        "freshness": { "status": "cached", "observed_at": "2026-09-13T11:00:00Z", "age_seconds": 3660 },
+        "active_children": [], "decisions_open": [], "holds": [],
+        "queued": [{ "id": "partial-queued", "title": "Known queued work", "repo": "epsilon", "kind": "ship", "blocked_by_ids": [], "unresolved_blocker_ids": [], "hold_reason": null, "hold_kind": null, "hold_until": null, "hold_bucket": null, "hold_age_days": null, "captain_actionable": false }],
+        "landed": [], "endpoints": [], "counts": { "active_children": 0, "decisions_open": 0, "holds": 0, "queued": 2, "landed": 0, "endpoints": 0 },
+        "omitted": [{ "surface": "queued", "count": 1 }]
+      },
+      {
+        "id": "mate-unreadable", "home": "/srv/mate-unreadable", "host": "host-unreadable", "remote": true, "registered": true, "current": { "state": "unknown", "reason": "structured home ledger is unreadable" },
+        "provenance": { "selected": "parent-event-fallback", "structured_home": "/srv/mate-unreadable", "parent_event_role": "fallback-only-not-current" },
+        "freshness": { "status": "historical-event", "observed_at": "2026-09-13T12:01:00Z", "age_seconds": 90 },
+        "active_children": [], "decisions_open": [], "holds": [], "queued": [], "landed": [], "endpoints": [],
+        "counts": { "active_children": 0, "decisions_open": 0, "holds": 0, "queued": 0, "landed": 0, "endpoints": 0 }, "omitted": []
+      }
+    ],
+    "total_registered": 3, "total": 3, "shown": 2, "truncated": 1
+  },
+  "secondmate_landed": { "records": [], "truncated": ["/srv/mate-partial"], "unreadable": ["/srv/mate-unreadable"], "partial": ["/srv/mate-partial"] },
+  "secondmate_guidance": { "note": "canonical guidance" }
+}

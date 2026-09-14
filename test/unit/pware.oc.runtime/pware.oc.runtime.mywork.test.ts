@@ -42,6 +42,7 @@ describe("myWorkLabel", () => {
     expect(myWorkLabel("question")).toBe("Awaiting answer")
     expect(myWorkLabel("interrupted")).toBe("Interrupted")
     expect(myWorkLabel("error")).toBe("Errors")
+    expect(myWorkLabel("firstmate")).toBe("Firstmate")
     expect(myWorkLabel("sessions")).toBe("Sessions")
     expect(myWorkLabel("ready-to-review")).toBe("Ready to review")
     expect(myWorkLabel("ready-to-start")).toBe("Ready to start")
@@ -281,7 +282,7 @@ describe("toApprovalItems", () => {
       { rel: "plans/d.md", name: "d", status: "done", pendingAction: null, updatedAt: null, sessionState: null, review: null, workState: "absent", todosDone: false },
     ])
     expect(items.map((i) => i.kind)).toEqual(["finished"])
-    expect(items.map((i) => ("sessionId" in i ? null : i.name))).toEqual(["d"])
+    expect(items.map((i) => ("name" in i ? i.name : null))).toEqual(["d"])
   })
 
   test("reconciles approved plans that actually finished — boulder or writer todos", () => {
@@ -349,8 +350,17 @@ describe("groupMyWork", () => {
     const draftDoc: MyWorkItem = { kind: "draft-docs", name: "old", rel: "drafts/old.md", updatedAt: null }
     const planDoc: MyWorkItem = { kind: "plans", name: "plan-x", rel: "plans/plan-x.md", updatedAt: null }
     const pinned: MyWorkItem = { kind: "pinned", sessionId: "ses_p", title: "Pinned", status: "idle", timeUpdated: 1_000 }
+    const firstmate: MyWorkItem = { kind: "firstmate", work: {
+      home: "/tmp/fm", taskId: "task-1", taskKind: null, project: null, title: "Durable", harness: null,
+      backend: null, worktree: null, durableState: "queued", currentRole: "queued", currentState: null,
+      currentSource: null, currentDetail: null, currentReason: null, holdKind: null, holdBucket: null,
+      holdReason: null, holdUntil: null, holdAgeDays: null, captainActionable: null,
+      blockedByIds: [], unresolvedBlockerIds: [], provenance: ["main-backlog"],
+      provenanceSelected: null, provenanceTrust: null, sourceFreshness: "fresh", freshness: "fresh",
+      observedAt: 1_000, ageSeconds: null,
+    } }
     expect(
-      groupMyWork([finished, dismissed, draftDoc, planDoc, pinned, approval, readyStart, drafting, question, interrupted, errored, sessions]).map(
+      groupMyWork([finished, dismissed, draftDoc, planDoc, pinned, approval, readyStart, drafting, question, interrupted, errored, firstmate, sessions]).map(
         (g) => g.kind,
       ),
     ).toEqual([
@@ -358,6 +368,7 @@ describe("groupMyWork", () => {
       "question",
       "interrupted",
       "error",
+      "firstmate",
       "sessions",
       "ready-to-review",
       "ready-to-start",
@@ -367,6 +378,38 @@ describe("groupMyWork", () => {
       "plans",
       "dismissed",
     ])
+  })
+
+  const liveSession: MyWorkItem = {
+    kind: "sessions", sessionId: "ses_live", title: "Active", status: "running", timeUpdated: 3_000,
+  }
+  const durableWork: MyWorkItem = { kind: "firstmate", work: {
+    home: "/tmp/fm", taskId: "task-1", taskKind: null, project: null, title: "Durable", harness: null,
+    backend: null, worktree: null, durableState: "queued", currentRole: "queued", currentState: null,
+    currentSource: null, currentDetail: null, currentReason: null, holdKind: null, holdBucket: null,
+    holdReason: null, holdUntil: null, holdAgeDays: null, captainActionable: null,
+    blockedByIds: [], unresolvedBlockerIds: [], provenance: ["main-backlog"],
+    provenanceSelected: null, provenanceTrust: null, sourceFreshness: "fresh", freshness: "fresh",
+    observedAt: 1_000, ageSeconds: null,
+  } }
+
+  test("an idle healthy Firstmate inventory spends no header row", () => {
+    expect(groupMyWork([liveSession], false).map((g) => g.kind)).toEqual(["pinned", "sessions"])
+    expect(groupMyWork([], false).map((g) => g.kind)).toEqual(["pinned"])
+  })
+
+  test("a Firstmate health notice keeps an empty group to render in", () => {
+    const withNotice = groupMyWork([liveSession], true)
+    expect(withNotice.map((g) => g.kind)).toEqual(["pinned", "firstmate", "sessions"])
+    expect(withNotice.find((g) => g.kind === "firstmate")?.items).toEqual([])
+    expect(groupMyWork([], true).map((g) => g.kind)).toEqual(["pinned", "firstmate"])
+  })
+
+  test("Firstmate rows keep their own group whether or not a notice is showing", () => {
+    expect(groupMyWork([durableWork, liveSession], false).map((g) => g.kind)).toEqual(["pinned", "firstmate", "sessions"])
+    const noticed = groupMyWork([durableWork, liveSession], true)
+    expect(noticed.filter((g) => g.kind === "firstmate")).toHaveLength(1)
+    expect(noticed.find((g) => g.kind === "firstmate")?.items).toEqual([durableWork])
   })
 
   test("pinned always leads the queue, even when empty", () => {
@@ -381,6 +424,7 @@ describe("groupMyWork", () => {
       "question",
       "interrupted",
       "error",
+      "firstmate",
       "sessions",
       "ready-to-review",
       "ready-to-start",

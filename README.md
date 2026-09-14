@@ -15,7 +15,7 @@ OpenCode shows one conversation at a time. This panel puts the rest of the work 
 
 | Feature             | What you get                                                                              |
 | ------------------- | ----------------------------------------------------------------------------------------- |
-| **My work**         | Questions, recent sessions, and (with OMO) plan queues waiting on you                     |
+| **My work**         | Questions, recent sessions, optional Firstmate durable work, and OMO plan queues          |
 | **Sessions**        | Title, age, live mark, `[C]` current. Header `switch` / `new`; palette `nw` / slash `/nw` |
 | **Live pulse**      | State + direction glyphs (working, queued, failed, streaming, waiting)                    |
 | **Tool calls**      | Named rows with duration; click for metadata — never args or output                       |
@@ -31,7 +31,7 @@ Four tabs: **My work** · **Session** · **Project** · **Stats**. Glyphs, colou
 
 | Tab         | Shows                                                                                                |
 | ----------- | ---------------------------------------------------------------------------------------------------- |
-| **My work** | Open questions, recent sessions (`switch` / `new`), OMO plan queues, `Draft docs` + `Plans` archives |
+| **My work** | Open questions, optional Firstmate work, recent sessions (`switch` / `new`), OMO queues, `Draft docs` + `Plans` archives |
 | **Session** | This agent, its delegates, tools, files, and (with OMO) drafts it wrote                              |
 | **Project** | Tools and files every recent session touched                                                         |
 | **Stats**   | Timing                                                                                               |
@@ -61,6 +61,28 @@ Restart the OpenCode TUI. OpenCode installs the package from npm. For local deve
 ## Configuration
 
 Later files win: plugin defaults → `~/.config/opencode/oes.json` → `<project>/oes.json`.
+
+### Firstmate (optional)
+
+Set `OES_FIRSTMATE_HOME` before starting OpenCode to add the `Firstmate` group to **My work**:
+
+```sh
+OES_FIRSTMATE_HOME="$HOME/path/to/firstmate-home" opencode
+```
+
+If the Firstmate code lives outside that home, also set `OES_FIRSTMATE_ROOT`:
+
+```sh
+OES_FIRSTMATE_HOME="$HOME/path/to/firstmate-home" \
+OES_FIRSTMATE_ROOT="$HOME/path/to/firstmate-code" \
+opencode
+```
+
+`OES_FIRSTMATE_HOME` is the only opt-in; Firstmate's own `FM_*` variables are never read as one, so an ambient Firstmate environment cannot enable the integration. Without `OES_FIRSTMATE_HOME`, Firstmate stays disabled and starts no process or timer.
+
+The group shows durable queued, in-flight, held, and blocked work across harnesses, even when no live OpenCode session exists. Selecting a row opens read-only details. There is currently no session navigation because `fm-fleet-snapshot.v1` has no durable OpenCode session mapping.
+
+OES polls Firstmate about every 30 seconds. Partial and unavailable reads show one inventory notice, and a failed read keeps the last good rows for the same home as stale. The integration only runs the trusted same-user executable at `bin/fm-fleet-snapshot.sh --json`. It disables the Firstmate snapshot cache and never starts a watcher, takes a lock, changes Firstmate data, or runs task actions. See [docs/firstmate.md](docs/firstmate.md).
 
 ```json
 {
@@ -127,6 +149,7 @@ A read-only view of data OpenCode already stores.
 | --------------- | ------------------------------------------------------------ | ----------------------------------- |
 | OpenCode SQLite | `~/.local/share/opencode/opencode.db` (or `OPENCODE_DB`)     | sessions, tools, files, timings     |
 | OMO             | `<project>/.omo/`                                            | plan approvals (My work) — optional |
+| Firstmate       | `bin/fm-fleet-snapshot.sh --json`                            | durable fleet work (optional)       |
 | `oes.json`      | plugin / user config / project                               | display limits                      |
 | ignore files    | `<project>/.oesignore` · `.gitignore` (with `skipGitignore`) | files hidden from the panel         |
 

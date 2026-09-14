@@ -1,0 +1,25 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-09-13T12:02:00Z",
+  "fm_home": "/tmp/fm-home",
+  "roots": { "fm_root": "/tmp/fm-root", "state": "/tmp/fm-home/state", "data": "/tmp/fm-home/data", "config": "/tmp/fm-home/config", "projects": "/tmp/fm-home/projects" },
+  "backlog": { "path": "/tmp/fm-home/data/backlog.md", "present": true, "records": [] },
+  "tasks": [],
+  "main_inventory": { "valid": true, "reason": null, "orphan_in_flight": [], "unstructured_current_count": 0 },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": { "present": true, "available": true, "complete": true, "reason": null, "provenance": "registered-table", "path": "/tmp/fm-home/config/secondmates", "freshness": { "status": "fresh", "observed_at": "2026-09-13T12:02:00Z" }, "records": [], "input_truncated": false, "records_truncated": false, "reasons": [], "lines_in_window": 1, "records_in_window": 1 },
+    "records": [{
+      "id": "mate-omitted", "home": "/srv/mate-omitted", "host": "host-omitted", "remote": true, "registered": true,
+      "current": { "state": "active_child_work", "reason": null },
+      "provenance": { "selected": "structured-home", "structured_home": "/srv/mate-omitted", "summary_source": "remote-ledger", "summary_valid": true, "trust": "complete", "parent_event_role": "historical-only" },
+      "freshness": { "status": "fresh", "observed_at": "2026-09-13T12:02:00Z", "age_seconds": 0 },
+      "active_children": [], "decisions_open": [], "holds": [], "queued": [], "landed": [], "endpoints": [],
+      "counts": { "active_children": 2, "decisions_open": 0, "holds": 0, "queued": 0, "landed": 0, "endpoints": 0 },
+      "omitted": [{ "surface": "active_children", "count": 2 }]
+    }],
+    "total_registered": 1, "total": 1, "shown": 1, "truncated": 0
+  },
+  "secondmate_landed": { "records": [], "truncated": [], "unreadable": [], "partial": [] },
+  "secondmate_guidance": { "note": "canonical guidance" }
+}

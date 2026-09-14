@@ -11,7 +11,7 @@ sidebar: tabs, glyphs, `oes.json`, and debug.
 
 | Tab | Shows |
 | --- | --- |
-| **My work** | Queue waiting on you: open questions, recent sessions (`switch` / `new`), OMO plan approvals, plus `Draft docs` and `Plans` archives |
+| **My work** | Open questions, optional Firstmate work, recent sessions (`switch` / `new`), OMO plan approvals, plus `Draft docs` and `Plans` archives |
 | **Session** | This agent, its delegates, tools, files, and — with OMO — drafts this session wrote (last five inline, then a `view all` picker) |
 | **Project** | Tools and files every recent session touched |
 | **Stats** | Timing |
@@ -89,6 +89,9 @@ Recent sessions live in **My work** as the `Sessions` group.
 | Three states: `?` **Awaiting answer**, `⊘` **Interrupted**, `×` **Errors** |
 | Interrupted and Errors rows open a picker: **Navigate to session** / **Dismiss** |
 | Dismissed questions have their own group |
+| Optional `Firstmate` group: durable queued, in-flight, held, and blocked work across harnesses, independent of live OpenCode sessions |
+| Selecting a Firstmate row opens read-only details; there is no session navigation because `fm-fleet-snapshot.v1` has no durable session mapping |
+| Stale, partial, and unavailable Firstmate reads show one inventory notice; omitted records are not synthesized |
 | `Sessions` group (`◔`) — every recent session, live or idle |
 | Sessions idle 48–72 hours render dimmed; past 72 hours they are hidden |
 | `Pinned` sits ahead of the queue — `P` pins a session up, `U` sends it back. Pins live in kv `oes.config`, not `oes.json` |
@@ -221,9 +224,10 @@ The panel is a read-only view of data OpenCode already stores.
 | --- | --- | --- |
 | OpenCode SQLite | `~/.local/share/opencode/opencode.db` (or `OPENCODE_DB`) | sessions, tools, files, timings |
 | OMO | `<project>/.omo/` | plan approvals (My work) — optional |
+| Firstmate | `bin/fm-fleet-snapshot.sh --json` | durable fleet work in My work (optional) |
 | `oes.json` | plugin / user config / project | display limits |
 | ignore files | `<project>/.oesignore` (always) · `.gitignore` (with `skipGitignore`) | files hidden from the panel |
 
-It refreshes from database stamps, file watches, and OpenCode events. The always-on runtime snapshot runs in a Bun worker; if the worker is unavailable, the same gateway runs in the host process. Snapshot, Project, My work and Perf reads are split into ordered layers.
+It refreshes from database stamps, file watches, and OpenCode events. The always-on runtime snapshot runs in a Bun worker; if the worker is unavailable, the same gateway runs in the host process. Optional Firstmate data comes from a separate 30-second read-only poller. See [firstmate.md](firstmate.md) for setup and failure handling.
 
 SQLite scheduling: [db-pooling.md](db-pooling.md). Module map: [ARCHITECTURE.md](../ARCHITECTURE.md).
