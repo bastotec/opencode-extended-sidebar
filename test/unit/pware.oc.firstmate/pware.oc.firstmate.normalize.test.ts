@@ -114,10 +114,23 @@ describe("normalizeFirstmate", () => {
     expect(snapshot.workItems.some((entry) => entry.home === "/srv/mate-unreadable")).toBe(false)
   })
 
-  test("marks a fresh valid snapshot partial for positive per-home omissions", () => {
+  test("marks a rowless omitted home partial with no freshness of its own", () => {
     const snapshot = normalizeFirstmate(omissionOnly, "/tmp/fm-home", "/tmp/fm-root")
-    expect(snapshot.freshness).toBe("fresh")
+    expect(snapshot.workItems).toEqual([])
+    expect(snapshot.freshness).toBe("unknown")
     expect(snapshot.completeness).toBe("partial")
+
+    const cached = structuredClone(omissionOnly)
+    cached.secondmate_current.records[0].freshness.status = "cached"
+    const stale = normalizeFirstmate(cached, "/tmp/fm-home", "/tmp/fm-root")
+    expect(stale.workItems).toEqual([])
+    expect(stale.freshness).toBe("unknown")
+  })
+
+  test("a visible stale Secondmate row still makes the section stale", () => {
+    const snapshot = normalizeFirstmate(degraded, "/tmp/fm-home", "/tmp/fm-root")
+    expect(snapshot.workItems.find((item) => item.taskId === "partial-queued")?.freshness).toBe("stale")
+    expect(snapshot.freshness).toBe("stale")
   })
 
   test("degrades malformed nested Secondmate rows and fields without projecting them", () => {

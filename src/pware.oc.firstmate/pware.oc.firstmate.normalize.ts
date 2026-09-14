@@ -412,8 +412,9 @@ function secondmateItems(records: JsonObject[]): Projection {
     const ageSeconds = finite(freshness?.age_seconds)
     const reason = text(current?.reason)
     if (!home || selected !== "structured-home") continue
-    observations.push(fresh(sourceFreshness))
+    let rendered = false
     const applyCommon = (item: FirstmateWorkItem, surface: string): void => {
+      rendered = true
       item.provenance = [...new Set([...item.provenance, `secondmate-${surface}`])]
       item.provenanceSelected = selected
       item.provenanceTrust = trust
@@ -500,6 +501,7 @@ function secondmateItems(records: JsonObject[]): Projection {
         item.captainActionable = decision.captainActionable
       } else item.currentRole = item.currentRole ?? "decision"
     }
+    if (rendered) observations.push(fresh(sourceFreshness))
   }
   return { items: [...byKey.values()], observations }
 }
