@@ -94,9 +94,11 @@ function fresh(value: unknown): FirstmateFreshness {
   return "unknown"
 }
 
-function aggregateFreshness(current: FirstmateFreshness, observed: FirstmateFreshness): FirstmateFreshness {
-  if (current === "stale" || observed === "stale") return "stale"
-  if (current === "unknown" || observed === "unknown") return "unknown"
+/** Only the producer's own observations decide freshness; none reported stays unknown. */
+function overallFreshness(observations: readonly FirstmateFreshness[]): FirstmateFreshness {
+  if (observations.length === 0) return "unknown"
+  if (observations.includes("stale")) return "stale"
+  if (observations.includes("unknown")) return "unknown"
   return "fresh"
 }
 
@@ -499,7 +501,7 @@ function secondmateItems(records: JsonObject[]): FirstmateWorkItem[] {
 export function normalizeFirstmate(value: unknown, configuredHome: string, configuredRoot: string): FirstmateSnapshot {
   const { backlog, tasks, main, current, landed, generatedAt } = validateEnvelope(value, configuredHome, configuredRoot)
   let partial = false
-  let overallFreshness: FirstmateFreshness = "fresh"
+  const observations: FirstmateFreshness[] = []
 
   if (backlog.present !== true) partial = true
   if (main.valid !== true) partial = true
@@ -507,7 +509,7 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
   if (requiredArray(main, "orphan_in_flight").length > 0) partial = true
 
   for (const task of tasks) {
-    overallFreshness = aggregateFreshness(overallFreshness, fresh(text(object(task.current_state)?.freshness)))
+    observations.push(fresh(text(object(task.current_state)?.freshness)))
   }
 
   const registry = requiredObject(current, "registry")
@@ -542,8 +544,7 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
     const status = text(object(summary.freshness)?.status)
     if (text(provenance?.selected) !== "structured-home" || text(provenance?.trust) !== "complete") partial = true
     if (objects(summary.omitted).some((entry) => (finite(entry.count) ?? 0) > 0)) partial = true
-    const normalized = fresh(status)
-    overallFreshness = aggregateFreshness(overallFreshness, normalized)
+    observations.push(fresh(status))
   }
   for (const key of ["truncated", "unreadable", "partial"]) {
     if (strings(landed[key]).length) partial = true
@@ -552,7 +553,7 @@ export function normalizeFirstmate(value: unknown, configuredHome: string, confi
   return {
     availability: "available",
     completeness: partial ? "partial" : "complete",
-    freshness: overallFreshness,
+    freshness: overallFreshness(observations),
     observedAt: generatedAt,
     home: configuredHome,
     root: configuredRoot,

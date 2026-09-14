@@ -23,7 +23,6 @@ function failureSnapshot(config: Configured, lastGood: FirstmateSnapshot | null)
 }
 
 export type FirstmatePollerOptions = {
-  env?: NodeJS.ProcessEnv
   pollMs?: number
   onSnapshot: (snapshot: FirstmateSnapshot) => void
   run?: (config: Configured, options: { signal: AbortSignal }) => Promise<FirstmateCommandResult>
@@ -31,7 +30,7 @@ export type FirstmatePollerOptions = {
 }
 
 export function startFirstmatePoller(options: FirstmatePollerOptions): FirstmatePollerHandle | null {
-  const config = options.configuration ?? discoverFirstmate(options.env)
+  const config = options.configuration ?? discoverFirstmate()
   if (!config.configured) return null
   if (config.diagnostic) {
     options.onSnapshot(unavailableFirstmate(config.home, config.root))

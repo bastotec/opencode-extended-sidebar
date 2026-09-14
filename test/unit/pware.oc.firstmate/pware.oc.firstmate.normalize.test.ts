@@ -169,6 +169,20 @@ describe("normalizeFirstmate", () => {
     expect(normalizeFirstmate(stale, "/tmp/fm-home", "/tmp/fm-root").freshness).toBe("stale")
   })
 
+  test("reports unknown aggregate freshness when the producer observed nothing", () => {
+    const unobserved = structuredClone(fixture)
+    unobserved.tasks = []
+    unobserved.secondmate_current.records = []
+    unobserved.secondmate_current.total_registered = 0
+    unobserved.secondmate_current.total = 0
+    unobserved.secondmate_current.shown = 0
+
+    const snapshot = normalizeFirstmate(unobserved, "/tmp/fm-home", "/tmp/fm-root")
+    expect(snapshot.freshness).toBe("unknown")
+    expect(snapshot.workItems.map((item) => item.taskId)).toEqual(["q1", "i1", "h1", "b1", "p1"])
+    expect(snapshot.workItems.every((item) => item.freshness === "unknown")).toBe(true)
+  })
+
   test("preserves stale aggregate freshness across stale and unknown Secondmate homes", () => {
     const mixed = structuredClone(fixture)
     mixed.tasks = []
